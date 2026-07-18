@@ -1,0 +1,44 @@
+{
+  "name": "smart-courier-parcel-management-system",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Design and Implementation of a Smart Courier and Parcel Management System",
+  "main": "index.js",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm:dev --workspace backend\" \"npm:dev --workspace frontend\"",
+    "server": "npm run dev --workspace backend",
+    "client": "npm run dev --workspace frontend"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/raihanmiraj/courier-parcel-management-system.git"
+  },
+  "keywords": [
+    "mern",
+    "express",
+    "mongodb",
+    "react",
+    "socket.io",
+    "courier",
+    "parcel",
+    "thesis",
+    "logistics"
+  ],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/raihanmiraj/smart-courier-parcel-management-system/issues"
+  },
+  "homepage": "https://github.com/raihanmiraj/smart-courier-parcel-management-system#readme",
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.11.0"
+  }
+}
