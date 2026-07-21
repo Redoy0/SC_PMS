@@ -1,4 +1,4 @@
-import { Parcel, PARCEL_STATUSES } from '../models/Parcel.js';
+import { Parcel, PARCEL_STATUSES, PARCEL_SIZES, PARCEL_TYPES, PAYMENT_TYPES } from '../models/Parcel.js';
 import { User } from '../models/User.js';
 import { io } from '../index.js';
 import { v4 as uuidv4 } from 'uuid';
@@ -15,6 +15,19 @@ export async function createParcel(req, res) {
 			codAmount,
 			notes
 		} = req.body;
+
+		if (!pickupAddress || !deliveryAddress) {
+			return res.status(400).json({ message: 'Pickup and delivery addresses are required' });
+		}
+		if (!PARCEL_SIZES.includes(parcelSize)) {
+			return res.status(400).json({ message: `parcelSize must be one of: ${PARCEL_SIZES.join(', ')}` });
+		}
+		if (!PARCEL_TYPES.includes(parcelType)) {
+			return res.status(400).json({ message: `parcelType must be one of: ${PARCEL_TYPES.join(', ')}` });
+		}
+		if (!PAYMENT_TYPES.includes(paymentType)) {
+			return res.status(400).json({ message: `paymentType must be one of: ${PAYMENT_TYPES.join(', ')}` });
+		}
 
 		const trackingCode = uuidv4().split('-')[0].toUpperCase();
 		const parcel = await Parcel.create({
@@ -83,6 +96,14 @@ export async function getParcel(req, res) {
 	try {
 		const parcel = await Parcel.findById(req.params.id).populate('customer', 'name email').populate('agent', 'name email');
 		if (!parcel) return res.status(404).json({ message: 'Not found' });
+
+		const { role, id: userId } = req.user;
+		const isOwner = role === 'customer' && String(parcel.customer?._id ?? parcel.customer) === String(userId);
+		const isAssignedAgent = role === 'agent' && String(parcel.agent?._id ?? parcel.agent) === String(userId);
+		if (role !== 'admin' && !isOwner && !isAssignedAgent) {
+			return res.status(403).json({ message: 'Forbidden' });
+		}
+
 		res.json(parcel);
 	} catch (err) {
 		res.status(500).json({ message: 'Fetch parcel failed' });

@@ -6,11 +6,7 @@ import LoginPage from './pages/Login.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import CustomerDashboard from './pages/CustomerDashboard.jsx';
 import AgentDashboard from './pages/AgentDashboard.jsx';
-import TrackParcel from './pages/TrackParcel.jsx';
 import PublicTrack from './pages/PublicTrack.jsx';
-import MapJavascriptRoute from './pages/MapJavascriptRoute.jsx';
-import PushInMap from './pages/PushInMap.jsx';
-import PushCurrentLocation from './pages/PushCurrentLocation.jsx';
 import ParcelRoute from './pages/ParcelRoute.jsx';
 import ParcelDetailView from './pages/ParcelDetailView.jsx';
 import CustomerParcelDetail from './pages/CustomerParcelDetail.jsx';
@@ -38,9 +34,6 @@ export default function App() {
             <Route element={<GuestRoute />}>
               <Route path="/login" element={<LoginPage />} />
             </Route>
-            <Route path="/test" element={<MapJavascriptRoute />} />
-            <Route path="/test/push" element={<PushInMap />} />
-            <Route path="/test/current" element={<PushCurrentLocation />} />
             <Route path="/track/:trackingCode" element={<PublicTrack />} />
             <Route path="/parcel/:id/route" element={<ParcelRoute />} />
 
@@ -61,7 +54,6 @@ export default function App() {
                 <Route path="/customer/parcel/:id" element={<CustomerParcelDetail />} />
                 <Route path="/customer/parcel/qr/:id" element={<CustomerQrScanner />} />
               </Route>
-              <Route path="/track/:id" element={<TrackParcel />} />
             </Route>
 
             <Route path="/" element={<Navigate to="/login" replace />} />

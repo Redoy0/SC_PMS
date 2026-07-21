@@ -9,6 +9,10 @@ export const PARCEL_STATUSES = [
 	'Failed'
 ];
 
+export const PARCEL_SIZES = ['Small', 'Medium', 'Large'];
+export const PARCEL_TYPES = ['Document', 'Fragile', 'Standard', 'Perishable'];
+export const PAYMENT_TYPES = ['COD', 'Prepaid'];
+
 const locationSchema = new mongoose.Schema(
 	{
 		lat: { type: Number },

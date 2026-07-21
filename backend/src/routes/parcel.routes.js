@@ -1,5 +1,5 @@
 import express from 'express';
-import { requireAuth } from '../middleware/auth.js';
+import { requireAuth, requireRoles } from '../middleware/auth.js';
 import * as parcelController from '../controllers/parcel.controller.js';
 
 const router = express.Router();
@@ -12,9 +12,9 @@ router.use(requireAuth);
 router.get('/', parcelController.listParcels);
 router.post('/', parcelController.createParcel);
 router.get('/:id', parcelController.getParcel);
-router.post('/:id/assign', parcelController.assignAgent);
+router.post('/:id/assign', requireRoles('admin'), parcelController.assignAgent);
 router.post('/:id/status', parcelController.updateStatus);
 router.post('/:id/location', parcelController.updateLocation);
-router.delete('/:id', parcelController.deleteParcel);
+router.delete('/:id', requireRoles('admin'), parcelController.deleteParcel);
 
 export default router;

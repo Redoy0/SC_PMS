@@ -1,6 +1,7 @@
 import http from 'http';
 import express from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import { Server as SocketIOServer } from 'socket.io';
@@ -16,6 +17,7 @@ import geocodeRoutes from './routes/geocode.routes.js';
 dotenv.config();
 
 const app = express();
+app.set('trust proxy', 1);
 const server = http.createServer(app);
 
 const corsOrigin = process.env.SOCKET_CORS_ORIGIN || process.env.CLIENT_ORIGIN || '*';
@@ -28,6 +30,7 @@ console.log('Socket.IO CORS origin:', corsOrigin);
 registerSocketHandlers(io);
 
 // Middlewares
+app.use(helmet());
 app.use(cors({ origin: process.env.CLIENT_ORIGIN || '*' }));
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));

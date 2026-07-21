@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { apiFetch, api } from '../api';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { apiFetch } from '../api';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useLanguage } from '../context/LanguageContext.jsx';
 import { getTranslations } from '../translations';
@@ -183,7 +183,6 @@ export default function AgentDashboard() {
   const geoWatchIdRef = useRef(null);
   const lastLocationUpdateRef = useRef(null);
   const lastLocationRef = useRef(null);
-  const [otpModal, setOtpModal] = useState({ open: false, parcelId: null, step: 'request', code: '', sending: false, error: '' });
 
   // Create user-specific socket
   useEffect(() => {
@@ -337,30 +336,6 @@ export default function AgentDashboard() {
       }
     };
   }, [parcels, socket, user?._id, user?.id]);
-
-  // OTP flow handlers
-  const requestDeliveryOtp = useCallback(async (parcelId) => {
-    setOtpModal({ open: true, parcelId, step: 'request', code: '', sending: true, error: '' });
-    try {
-      await apiFetch(`/parcels/${parcelId}/request-delivery-otp`, { method: 'POST' });
-      setOtpModal({ open: true, parcelId, step: 'confirm', code: '', sending: false, error: '' });
-    } catch (e) {
-      setOtpModal({ open: true, parcelId, step: 'request', code: '', sending: false, error: e?.message || 'Failed to send OTP' });
-    }
-  }, []);
-
-  const confirmDeliveryOtp = useCallback(async () => {
-    const { parcelId, code } = otpModal;
-    if (!parcelId || !code) return;
-    setOtpModal(m => ({ ...m, sending: true, error: '' }));
-    try {
-      const updated = await apiFetch(`/parcels/${parcelId}/confirm-delivery-otp`, { method: 'POST', body: JSON.stringify({ code }) });
-      setParcels(list => list.map(x => x._id === updated._id ? updated : x));
-      setOtpModal({ open: false, parcelId: null, step: 'request', code: '', sending: false, error: '' });
-    } catch (e) {
-      setOtpModal(m => ({ ...m, sending: false, error: e?.message || 'Invalid OTP' }));
-    }
-  }, [otpModal]);
 
   useEffect(() => {
     apiFetch('/parcels').then(setParcels).catch(()=>{});
@@ -551,141 +526,6 @@ export default function AgentDashboard() {
           <LiveMap agentPosition={agentPosition} />
         </div>
       </main>
-
-      {/* OTP Modal */}
-      {otpModal.open && (
-        <div className="modal-overlay">
-          <div className="modal-content max-w-md">
-            <div className="modal-header">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-brand-100 text-brand-600">
-                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                  </svg>
-                </div>
-                <div>
-                  <h4 className="text-lg font-semibold text-surface-900">{t.confirmDelivery}</h4>
-                  <p className="text-sm text-surface-500">Verify delivery with OTP</p>
-                </div>
-              </div>
-              <button 
-                onClick={() => setOtpModal({ open: false, parcelId: null, step: 'request', code: '', sending: false, error: '' })}
-                className="rounded-lg p-2 text-surface-400 hover:bg-surface-100 hover:text-surface-600 transition-colors"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="modal-body">
-              {otpModal.step === 'request' ? (
-                <div className="space-y-4">
-                  <div className="rounded-xl bg-brand-50 border border-brand-100 p-4">
-                    <div className="flex gap-3">
-                      <svg className="h-5 w-5 text-brand-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-sm text-brand-700">{t.sendOtpMessage}</p>
-                    </div>
-                  </div>
-                  {otpModal.error && (
-                    <div className="alert-danger">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {otpModal.error}
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  <div className="rounded-xl bg-success-50 border border-success-100 p-4">
-                    <div className="flex gap-3">
-                      <svg className="h-5 w-5 text-success-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="text-sm text-success-700">{t.enterOtpMessage}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-surface-700 mb-2">Enter OTP Code</label>
-                    <input 
-                      maxLength={6} 
-                      value={otpModal.code} 
-                      onChange={e => setOtpModal(m => ({ ...m, code: e.target.value }))} 
-                      className="input text-center text-2xl tracking-[0.5em] font-mono" 
-                      placeholder="000000" 
-                    />
-                  </div>
-                  {otpModal.error && (
-                    <div className="alert-danger">
-                      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      {otpModal.error}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-            <div className="modal-footer">
-              <button 
-                className="btn-secondary" 
-                onClick={() => setOtpModal({ open: false, parcelId: null, step: 'request', code: '', sending: false, error: '' })}
-              >
-                {t.cancel}
-              </button>
-              {otpModal.step === 'request' ? (
-                <button 
-                  disabled={otpModal.sending} 
-                  className="btn-primary" 
-                  onClick={() => requestDeliveryOtp(otpModal.parcelId)}
-                >
-                  {otpModal.sending ? (
-                    <>
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                      {t.sendOtp}
-                    </>
-                  )}
-                </button>
-              ) : (
-                <button 
-                  disabled={otpModal.sending || !otpModal.code} 
-                  className="btn-success" 
-                  onClick={confirmDeliveryOtp}
-                >
-                  {otpModal.sending ? (
-                    <>
-                      <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      {t.confirm}
-                    </>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }

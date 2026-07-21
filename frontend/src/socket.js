@@ -8,6 +8,7 @@ console.log('🔌 All env vars:', import.meta.env);
 
 // Create a default socket instance for general use
 export const socket = io(SOCKET_URL, {
+	auth: { token: localStorage.getItem('token') || undefined },
 	reconnection: true,
 	reconnectionDelay: 1000,
 	reconnectionAttempts: 5
@@ -24,8 +25,9 @@ socket.on('connect_error', (error) => {
 // Export the createSocket function for creating user-specific sockets
 export function createSocket(userId) {
 	console.log('Creating socket for userId:', userId, 'URL:', SOCKET_URL);
-	const socketInstance = io(SOCKET_URL, { 
+	const socketInstance = io(SOCKET_URL, {
 		query: { userId },
+		auth: { token: localStorage.getItem('token') || undefined },
 		reconnection: true,
 		reconnectionDelay: 1000,
 		reconnectionAttempts: 5
