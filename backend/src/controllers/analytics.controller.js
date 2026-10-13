@@ -2,6 +2,7 @@ import { Parcel } from '../models/Parcel.js';
 import { createObjectCsvWriter } from 'csv-writer';
 import PDFDocument from 'pdfkit';
 
+// Admin-only (enforced in analytics.routes.js)
 export async function dashboardMetrics(_req, res) {
 	try {
 		const today = new Date();

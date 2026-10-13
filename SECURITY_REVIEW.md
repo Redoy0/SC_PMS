@@ -87,7 +87,9 @@ Registration's catch block returned `err.message` (raw DB/internal error text) t
 
 **Verification for #12–14:** Ran `npm run build` (clean) and `eslint` (clean) after the edits, then launched the real Vite dev server + Express backend against the isolated test database and drove a headless Chromium browser through: (a) agent login → dashboard renders with zero "OTP" text/elements and no console errors beyond expected geolocation-denied noise in a headless context; (b) `/track/<code>` renders the public tracking page correctly; (c) `/test`, `/test/push`, `/test/current` all now redirect away (bounced to `/agent` since already authenticated in that session — would go to `/login` for a logged-out visitor) instead of rendering.
 
-## Not fixed — recommendations only
+## Not fixed in round 1 — recommendations only
+
+> **Update (round 2, 2026-10-12):** the JWT-in-localStorage, global location broadcast, CORS `*` fallback and nodemailer/uuid items below are now resolved. See *Round 2* at the end of this document.
 
 These are real but lower-priority, or would require a larger redesign / cross-file frontend changes beyond a targeted security fix:
 
@@ -120,3 +122,82 @@ frontend/src/pages/PushInMap.jsx             (deleted — unauthenticated debug 
 frontend/src/pages/PushCurrentLocation.jsx   (deleted — unauthenticated debug page)
 package-lock.json                            (npm audit fix, new deps — npm workspaces root lockfile)
 ```
+
+---
+
+# Round 2 — Production hardening and new account system
+
+Date: 2026-10-12
+Goal: bring authentication, account management and real-time data handling up to the standard expected of a production logistics platform.
+Method: implementation followed by an automated end-to-end test (66 API/socket checks) against an isolated in-memory MongoDB, plus a scripted headless-Chrome run of the sign-up, verification, session-restore, logout and admin-onboarding flows (12 checks). All 78 checks pass. Production data was never touched and no real email was sent (development mode prints emails to the server log).
+
+## 15. Authentication tokens: localStorage → in-memory access token + httpOnly refresh cookie
+- **Before:** a 7-day JWT stored in `localStorage`, readable by any injected script; logout did not invalidate it.
+- **Now:**
+  - Access token: 15-minute JWT (`HS256`, issuer-checked) held only in JavaScript memory and sent as `Authorization: Bearer`.
+  - Refresh token: 384-bit random value in an `HttpOnly`, `Secure` (production), `SameSite=Lax`, `Path=/api/auth` cookie. Only its SHA-256 hash is stored (`Session` collection with an auto-expiring TTL index).
+  - **Rotation with reuse detection:** every refresh issues a new token; presenting an already-rotated token after a 30-second grace window revokes the whole token family (stolen-token defence). The grace window covers two tabs refreshing at the same moment.
+  - **Revocation:** each user has a `tokenVersion` that is embedded in access tokens. Password reset and account disable bump it, so outstanding tokens stop working on the next request, and all refresh sessions are revoked.
+  - Session length: 1 day, or 30 days with "Keep me signed in".
+  - **CSRF:** the cookie is `SameSite=Lax`, and the two cookie-authenticated endpoints (`/auth/refresh`, `/auth/logout`) also require an `X-Requested-With: XMLHttpRequest` header, which cross-site forms cannot send.
+- **Deployment:** the frontend now calls the API on its own origin (`/api`), proxied to Render by `frontend/vercel.json`, `netlify.toml` and `vite.config.js`, so the cookie is first-party and works with Safari and third-party-cookie blocking.
+- Files: `backend/src/services/session.service.js`, `backend/src/models/Session.js`, `backend/src/utils/jwt.js`, `backend/src/middleware/auth.js`, `frontend/src/api.js`, `frontend/src/context/AuthContext.jsx`, `frontend/src/socket.js`.
+
+## 16. New sign-up system
+- **Customers only** can self-register. The misleading "Delivery Agent" role picker was removed (the server already ignored it).
+- Required fields: full name, email, Bangladeshi mobile number (validated and normalised to `01XXXXXXXXX`), password, confirmation, and acceptance of the terms.
+- **Password policy:** 8–64 characters with at least one letter and one number, enforced on both client and server; bcrypt cost raised to 12. A live strength meter guides the user.
+- **Email verification:** sign-up sends a 6-digit one-time code (cryptographically random, stored hashed, 10-minute expiry, at most 5 attempts, 60-second resend cooldown). Accounts cannot sign in until verified. `EMAIL_VERIFICATION=off` exists only for an offline demo.
+- **Forgot / reset password:** single-use, hashed, 30-minute reset links. The response is identical whether or not the email exists (no account enumeration). A reset signs the user out on all devices.
+- **Delivery agents are onboarded by an admin** (Admin dashboard → *Add agent*). The agent receives an invitation link (72 hours, single-use) to set their own password. Until activated, an agent cannot be assigned parcels. If the email cannot be delivered, the admin is shown the link to share securely.
+- **Admins can disable and re-enable accounts**; disabling signs the user out everywhere immediately.
+
+## 17. Brute-force and abuse protection
+- Per-account lockout: 5 failed passwords lock the account for 15 minutes. The lock is checked before the password, so a correct guess during the lockout still fails.
+- Constant-time login for unknown emails (a dummy bcrypt comparison) prevents user enumeration by timing.
+- Per-endpoint rate limits (`backend/src/middleware/rateLimits.js`) for login, sign-up, code verification, email sending, refresh, public tracking and geocoding, plus a global API limit.
+- `TRUST_PROXY_HOPS` lets the limiter see real client IPs behind Vercel → Render.
+
+## 18. NoSQL injection
+- `backend/src/middleware/sanitize.js` strips keys beginning with `$` or containing `.` from every request body and query string, so payloads such as `{"email": {"$ne": null}}` cannot become query operators. Identifiers are also type-checked (`isValidObjectId`) and return 400 instead of 500.
+
+## 19. Real-time (Socket.IO) data scoping — resolves the round-1 "global broadcast" item
+- Sockets authenticate in middleware and re-check the user's active status and `tokenVersion`.
+- Rooms: `role:admin`, `user:<id>`, `parcel:<id>`. **No event is broadcast to every client any more.**
+- Agent locations go only to admins and to watchers of that agent's *active* parcels (the room list is cached for 15 seconds to avoid a database query per GPS update). Coordinates are range-validated.
+- Anonymous (public tracking) sockets may join a parcel room only by proving the tracking code.
+- `request:agent:location` is admin-only and forwarded only to that agent.
+
+## 20. Public tracking privacy
+- `GET /api/parcels/track/:code` returns a reduced view with no customer name, email, phone or internal notes; the agent appears only by name and ID.
+- New tracking codes are 10 characters from a 32-symbol alphabet (about 50 bits) generated with `crypto.randomInt`, replacing 8 hex characters taken from a UUID (32 bits). Together with rate limiting, codes cannot practically be enumerated. Existing codes still work.
+
+## 21. Data integrity
+- Parcel lifecycle state machine: agents can only move a parcel forward (or mark it failed while active); delivered and failed parcels are locked; only admins can correct a status.
+- Every status change is recorded in `statusHistory` (status, time, user, role), which provides an audit trail.
+- Booking is customer-only; field lengths and COD amounts (0–500,000) are validated; location updates are accepted only for active parcels.
+
+## 22. Configuration and operational hardening
+- `CLIENT_ORIGIN` is required in production (a comma-separated allow-list, with credentials enabled); the `'*'` fallback is gone. The same list applies to Socket.IO.
+- `JWT_SECRET` must be at least 32 characters in production.
+- `dotenv` now loads before any module reads `process.env`. Previously `.env` values for mail and JWT were read too early and silently ignored when running locally.
+- Central JSON error handler (no stack traces), 404 for unknown API routes, malformed JSON → 400, 100 kB body limit, and errors from async routes are caught.
+- Emails escape all user-supplied text (HTML-injection fix). Status emails are sent asynchronously, so SMTP latency cannot block or fail a status update.
+- The seed script no longer creates accounts with publicly known passwords in production (`SEED_ADMIN_PASSWORD` and `SEED_AGENT_PASSWORD` are required).
+- Frontend security headers on Vercel and Netlify: `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, HSTS and `Permissions-Policy`.
+
+## 23. Dependencies
+- `nodemailer` upgraded to 10.x; `uuid` removed (replaced by Node's `crypto`); the unused `nodemailer` dependency removed from the frontend; `npm audit fix` applied.
+- `npm audit --omit=dev` reports **0 vulnerabilities** in shipped dependencies. The remaining advisories are in build-time tooling (the Tailwind CSS 3 chain) and never reach users.
+
+## Deployment checklist for the new system
+| Where | Setting |
+| --- | --- |
+| Render | `JWT_SECRET` (at least 32 random characters), `CLIENT_ORIGIN` and `APP_URL` = the Vercel site URL, `TRUST_PROXY_HOPS=2`, `MAIL_USER` / `MAIL_PASS` / `MAIL_FROM` (Gmail app password) |
+| Vercel | No environment change needed: `.env.production` now uses `VITE_API_BASE=/api`, and `vercel.json` proxies `/api/*` to Render |
+| Database | Existing users keep working (treated as verified). Existing browser sessions end once, so users sign in again. |
+
+## Remaining recommendations
+- A Content-Security-Policy for the frontend (needs testing against Google Maps, OSM tiles and the OSRM router).
+- Optional two-factor authentication for admin accounts.
+- Persisting agent location history server-side (currently held in memory) if route analytics are needed.
