@@ -9,7 +9,7 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently \"npm:dev --workspace backend\" \"npm:dev --workspace frontend\"",
+    "dev": "concurrently --kill-others-on-fail --names api,web --prefix-colors cyan,magenta \"npm run dev --workspace backend\" \"npm run dev --workspace frontend\"",
     "server": "npm run dev --workspace backend",
     "client": "npm run dev --workspace frontend"
   },

@@ -12,3 +12,25 @@ services:
         value: production
       - key: PORT
         value: 10000
+      # Vercel /api rewrite -> Render: two proxy hops before the app
+      - key: TRUST_PROXY_HOPS
+        value: 2
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: EMAIL_VERIFICATION
+        value: required
+      # Secrets and deployment-specific values: set these in the Render dashboard
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MONGODB_URI
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: APP_URL
+        sync: false
+      - key: MAIL_USER
+        sync: false
+      - key: MAIL_PASS
+        sync: false
+      - key: MAIL_FROM
+        sync: false

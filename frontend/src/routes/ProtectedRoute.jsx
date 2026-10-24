@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
+import { roleHomePath } from '../utils/roleHome.js';
 
 export function ProtectedRoute() {
   const { token, loading } = useAuth();
@@ -11,16 +12,12 @@ export function ProtectedRoute() {
 export function RoleRoute({ roles }) {
   const { user, loading } = useAuth();
   if (loading) return null;
-  if (!user || (roles && !roles.includes(user.role))) {
-    return <Navigate to="/" replace />;
+  if (!user) return <Navigate to="/login" replace />;
+  if (roles && !roles.includes(user.role)) {
+    // "/" is now the public landing page, so send wrong-role users to their own dashboard
+    return <Navigate to={roleHomePath(user.role)} replace />;
   }
   return <Outlet />;
-}
-
-function roleHomePath(role) {
-  if (role === 'admin') return '/admin';
-  if (role === 'agent') return '/agent';
-  return '/app';
 }
 
 export function GuestRoute() {

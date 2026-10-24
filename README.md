@@ -124,12 +124,14 @@ npm run dev
 Use `backend/env.example` as the reference for required variables. For production, configure:
 
 - `MONGODB_URI`
-- `JWT_SECRET`
-- `MAIL_HOST`, `MAIL_USER`, `MAIL_PASS`
-- `CLIENT_ORIGIN`
-- `SOCKET_CORS_ORIGIN`
-- `VITE_API_BASE`
+- `JWT_SECRET` (at least 32 random characters)
+- `MAIL_HOST`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` (required for sign-up email verification)
+- `CLIENT_ORIGIN`, `APP_URL` (the deployed frontend URL)
+- `TRUST_PROXY_HOPS` (`2` when the frontend proxies `/api` to the backend)
+- `VITE_API_BASE` (`/api`; the frontend host proxies it to the backend)
 - `VITE_SOCKET_URL`
+
+See the deployment checklist at the end of `SECURITY_REVIEW.md`.
 
 ## Validation Goals
 

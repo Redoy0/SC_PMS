@@ -1,8 +1,13 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext.jsx';
+import { AuthProvider } from './context/AuthContext.jsx';
 import { LanguageProvider } from './context/LanguageContext.jsx';
-import { ProtectedRoute, RoleRoute, GuestRoute, AdminRoute, DeliveryAgentRoute, CustomerRoute } from './routes/ProtectedRoute.jsx';
+import { ProtectedRoute, GuestRoute, AdminRoute, DeliveryAgentRoute, CustomerRoute } from './routes/ProtectedRoute.jsx';
+import Landing from './pages/Landing.jsx';
 import LoginPage from './pages/Login.jsx';
+import RegisterPage from './pages/Register.jsx';
+import VerifyEmailPage from './pages/VerifyEmail.jsx';
+import ForgotPasswordPage from './pages/ForgotPassword.jsx';
+import ResetPasswordPage from './pages/ResetPassword.jsx';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import CustomerDashboard from './pages/CustomerDashboard.jsx';
 import AgentDashboard from './pages/AgentDashboard.jsx';
@@ -17,14 +22,6 @@ import AgentPickupConfirmPage from './pages/AgentPickupConfirmPage.jsx';
 import TrackPublicParcel from './pages/TrackPublicParcel.jsx';
 import CustomerQrScanner from './pages/CustomerQrScanner.jsx';
 
-function RootRedirect() {
-  const { user } = useAuth();
-  if (!user) return <Navigate to="/login" replace />;
-  if (user.role === 'admin') return <Navigate to="/admin" replace />;
-  if (user.role === 'agent') return <Navigate to="/agent" replace />;
-  return <Navigate to="/app" replace />;
-}
-
 export default function App() {
   return (
     <LanguageProvider>
@@ -33,7 +30,12 @@ export default function App() {
           <Routes>
             <Route element={<GuestRoute />}>
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/register" element={<RegisterPage />} />
+              <Route path="/verify-email" element={<VerifyEmailPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
             </Route>
+            {/* Not guest-only: an invite link may be opened in a browser where an admin is signed in */}
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route path="/track/:trackingCode" element={<PublicTrack />} />
             <Route path="/parcel/:id/route" element={<ParcelRoute />} />
 
@@ -56,9 +58,9 @@ export default function App() {
               </Route>
             </Route>
 
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<Landing />} />
             <Route path="/track-parcel" element={<TrackPublicParcel />} />
-            <Route path="*" element={<Navigate to="/login" replace />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

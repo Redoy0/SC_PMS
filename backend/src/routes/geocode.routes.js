@@ -1,4 +1,5 @@
 import express from 'express';
+import { geocodeLimiter } from '../middleware/rateLimits.js';
 
 const router = express.Router();
 
@@ -40,7 +41,7 @@ async function geocodeWithNominatim(query, limit) {
 
 	const response = await fetch(url.toString(), {
 		headers: {
-			'User-Agent': 'CourierParcelManagementSystem/1.0 (https://github.com/courier-app; courier-app@example.com)',
+			'User-Agent': `SCPMS/1.0 (${process.env.GEOCODE_CONTACT || process.env.MAIL_FROM || 'scpms'})`,
 			'Accept': 'application/json',
 			'Accept-Language': 'en'
 		}
@@ -53,12 +54,13 @@ async function geocodeWithNominatim(query, limit) {
 	return await response.json();
 }
 
-router.get('/search', async (req, res) => {
+router.get('/search', geocodeLimiter, async (req, res) => {
 	try {
-		const query = (req.query.q || '').toString().trim();
-		const limit = Number(req.query.limit || 1);
-		if (!query) {
-			return res.status(400).json({ message: 'Missing q parameter' });
+		const query = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+		// Clamp so this public proxy cannot be used for bulk lookups against upstream services
+		const limit = Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 1, 1), 5);
+		if (!query || query.length > 200) {
+			return res.status(400).json({ message: 'q must be 1-200 characters' });
 		}
 
 		// Append Bangladesh to improve geocoding results for local addresses

@@ -1,7 +1,10 @@
 import mongoose from 'mongoose';
 
+// Ignore unknown fields in queries instead of passing them through
+mongoose.set('strictQuery', true);
+
 export async function connectToDatabase() {
-	const mongoUri = process.env.MONGODB_URI || 'ongodb://127.0.0.1:27017/courier_db';
+	const mongoUri = process.env.MONGODB_URI || (process.env.NODE_ENV === 'production' ? '' : 'mongodb://127.0.0.1:27017/courier_db');
 	if (!mongoUri) {
 		throw new Error('MONGODB_URI not set');
 	}

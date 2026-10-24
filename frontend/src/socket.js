@@ -1,49 +1,40 @@
 import { io } from 'socket.io-client';
+import { getAccessToken } from './api';
 
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
-console.log('🔌 Socket.IO URL:', SOCKET_URL);
-console.log('🔌 VITE_SOCKET_URL env:', import.meta.env.VITE_SOCKET_URL);
-console.log('🔌 All env vars:', import.meta.env);
+// The token is read on every (re)connect, so sockets always use the latest
+// in-memory access token. Without one, the socket is anonymous and can only
+// follow parcels it proves it knows the tracking code for.
+const authFromMemory = (cb) => cb({ token: getAccessToken() || undefined });
 
-// Create a default socket instance for general use
+// Shared socket for public pages and general use
 export const socket = io(SOCKET_URL, {
-	auth: { token: localStorage.getItem('token') || undefined },
+	auth: authFromMemory,
 	reconnection: true,
 	reconnectionDelay: 1000,
 	reconnectionAttempts: 5
 });
 
-socket.on('connect', () => {
-	console.log('✅ Default socket connected:', socket.id);
-});
+// Re-handshake after sign-in/sign-out so the server re-evaluates identity
+export function reconnectSocket() {
+	if (socket.connected) socket.disconnect();
+	socket.connect();
+}
 
-socket.on('connect_error', (error) => {
-	console.error('❌ Default socket error:', error.message);
-});
-
-// Export the createSocket function for creating user-specific sockets
-export function createSocket(userId) {
-	console.log('Creating socket for userId:', userId, 'URL:', SOCKET_URL);
+// Dedicated socket for a page; identity comes from the access token, the
+// label is only used for local debugging
+export function createSocket(label) {
 	const socketInstance = io(SOCKET_URL, {
-		query: { userId },
-		auth: { token: localStorage.getItem('token') || undefined },
+		auth: authFromMemory,
 		reconnection: true,
 		reconnectionDelay: 1000,
 		reconnectionAttempts: 5
 	});
-	
-	socketInstance.on('connect', () => {
-		console.log('✅ Socket connected:', socketInstance.id, 'for user:', userId);
-	});
-	
+
 	socketInstance.on('connect_error', (error) => {
-		console.error('❌ Socket connection error:', error.message, error);
+		console.error('Socket connection error:', label, error.message);
 	});
-	
-	socketInstance.on('disconnect', (reason) => {
-		console.log('🔴 Socket disconnected:', reason);
-	});
-	
+
 	return socketInstance;
 }

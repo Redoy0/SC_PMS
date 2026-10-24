@@ -29,7 +29,7 @@ export default function PublicTrack() {
  
   useEffect(() => {
     if (!parcel) return; 
-    socket.emit('subscribe:parcel', parcel._id); 
+    socket.emit('subscribe:parcel', { parcelId: parcel._id, trackingCode: parcel.trackingCode });
     const handleParcelUpdate = (updatedParcel) => {
       if (updatedParcel.id === parcel._id) {
         setParcel(prev => ({ ...prev, ...updatedParcel }));
@@ -60,7 +60,7 @@ export default function PublicTrack() {
     socket.on('agent:location:update', handleAgentLocationUpdate);
 
     return () => {
-      socket.emit('unsubscribe:parcel', parcel._id);
+      socket.emit('unsubscribe:parcel', { parcelId: parcel._id });
       socket.off('parcel:update', handleParcelUpdate);
       socket.off('parcel:location', handleLocationUpdate);
       socket.off('agent:location:update', handleAgentLocationUpdate);

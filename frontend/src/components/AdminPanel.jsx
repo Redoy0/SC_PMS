@@ -4,6 +4,7 @@ import { useLanguage } from '../context/LanguageContext.jsx';
 import { getTranslations } from '../translations';
 import { Link } from 'react-router-dom';
 import { createSocket } from '../socket';
+import { useAuth } from '../context/AuthContext.jsx';
 
 function Stat({ label, value, icon, colorClass }) {
   return (
@@ -161,6 +162,172 @@ function AssignmentCell({ parcel, agents, onAssigned, onSuccess }) {
   );
 }
 
+function UserStatusBadge({ user }) {
+  const { currentLanguage } = useLanguage();
+  const t = getTranslations(currentLanguage);
+  if (!user.isActive) return <span className="badge bg-danger-50 text-danger-700 border border-danger-200">{t.statusDisabled}</span>;
+  if (!user.emailVerified) {
+    return (
+      <span className="badge bg-warning-50 text-warning-700 border border-warning-200">
+        {user.role === 'agent' ? t.statusInvitePending : t.statusUnverified}
+      </span>
+    );
+  }
+  return <span className="badge bg-success-50 text-success-700 border border-success-200">{t.statusActive}</span>;
+}
+
+function AddAgentModal({ onClose, onCreated }) {
+  const { currentLanguage } = useLanguage();
+  const t = getTranslations(currentLanguage);
+  const [form, setForm] = useState({ name: '', email: '', phone: '' });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
+  const [copied, setCopied] = useState(false);
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const res = await apiFetch('/users/agents', { method: 'POST', body: JSON.stringify(form) });
+      setResult(res);
+      onCreated(res.user);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(result.inviteLink);
+      setCopied(true);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  return (
+    <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="add-agent-title">
+      <div className="modal-content">
+        <div className="modal-header">
+          <h3 id="add-agent-title" className="text-lg font-bold text-surface-900">{t.addAgent}</h3>
+          <button onClick={onClose} className="btn-ghost p-1.5" aria-label={t.close}>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        {result ? (
+          <div className="modal-body space-y-4">
+            {result.emailSent ? (
+              <div className="alert alert-success">{t.agentInviteEmailed.replace('{email}', result.user.email)}</div>
+            ) : (
+              <>
+                <div className="alert alert-warning">{t.agentInviteNotEmailed}</div>
+                <div className="flex gap-2">
+                  <input readOnly value={result.inviteLink} className="input font-mono text-xs" onFocus={(e) => e.target.select()} />
+                  <button type="button" onClick={copy} className="btn-secondary">{copied ? t.copied : t.copy}</button>
+                </div>
+              </>
+            )}
+            <div className="flex justify-end">
+              <button onClick={onClose} className="btn-primary">{t.done}</button>
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={submit}>
+            <div className="modal-body space-y-4">
+              <p className="text-sm text-surface-500">{t.addAgentHelp}</p>
+              <div className="form-group">
+                <label htmlFor="agent-name" className="label">{t.fullName}</label>
+                <input id="agent-name" className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} maxLength={80} required />
+              </div>
+              <div className="form-group">
+                <label htmlFor="agent-email" className="label">{t.email}</label>
+                <input id="agent-email" type="email" className="input" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} required />
+              </div>
+              <div className="form-group">
+                <label htmlFor="agent-phone" className="label">{t.phoneNumber}</label>
+                <input id="agent-phone" type="tel" className="input" placeholder="01XXXXXXXXX" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} maxLength={16} required />
+              </div>
+              {error && <div className="alert alert-error">{error}</div>}
+            </div>
+            <div className="modal-footer">
+              <button type="button" onClick={onClose} className="btn-secondary">{t.cancel}</button>
+              <button type="submit" disabled={saving} className="btn-primary">
+                {saving ? <span className="spinner"></span> : t.sendInvite}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function UserRow({ user, isSelf, onChanged, onNotify }) {
+  const { currentLanguage } = useLanguage();
+  const t = getTranslations(currentLanguage);
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async () => {
+    const next = !user.isActive;
+    if (!next && !window.confirm(t.confirmDisableUser.replace('{name}', user.name))) return;
+    setBusy(true);
+    try {
+      const updated = await apiFetch(`/users/${user._id}/status`, { method: 'PATCH', body: JSON.stringify({ isActive: next }) });
+      onChanged(updated);
+    } catch (err) {
+      onNotify(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resend = async () => {
+    setBusy(true);
+    try {
+      const res = await apiFetch(`/users/${user._id}/resend-invite`, { method: 'POST' });
+      onNotify(res.emailSent ? t.inviteResent : `${t.agentInviteNotEmailed} ${res.inviteLink}`);
+    } catch (err) {
+      onNotify(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors">
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center text-white font-semibold ${user.isActive ? 'bg-gradient-to-br from-brand-500 to-brand-600' : 'bg-surface-400'}`}>
+          {user.name?.charAt(0)?.toUpperCase() || '?'}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-medium text-surface-900 truncate">{user.name}{isSelf && <span className="text-surface-400 font-normal"> ({t.you})</span>}</p>
+          <p className="text-sm text-surface-500 truncate">{user.email}</p>
+        </div>
+        <RoleBadge role={user.role} />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 pl-[3.25rem]">
+        <UserStatusBadge user={user} />
+        {!isSelf && (
+          <div className="flex gap-1.5">
+            {user.role === 'agent' && !user.emailVerified && user.isActive && (
+              <button onClick={resend} disabled={busy} className="btn-ghost btn-sm">{t.resendInvite}</button>
+            )}
+            <button onClick={toggle} disabled={busy} className={`btn btn-sm ${user.isActive ? 'text-danger-600 hover:bg-danger-50' : 'text-success-600 hover:bg-success-50'}`}>
+              {busy ? <span className="spinner"></span> : user.isActive ? t.disable : t.enable}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminPanel() {
   const { currentLanguage } = useLanguage();
   const t = getTranslations(currentLanguage);
@@ -171,6 +338,16 @@ export default function AdminPanel() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [successMessage, setSuccessMessage] = useState('');
+  const [showAddAgent, setShowAddAgent] = useState(false);
+  const { user: currentUser } = useAuth();
+
+  const refreshAgents = () => apiFetch('/assignments/agents').then(setAgents).catch(() => {});
+  const upsertUser = (updated) => {
+    setUsers(list => list.some(u => u._id === updated._id)
+      ? list.map(u => (u._id === updated._id ? updated : u))
+      : [updated, ...list]);
+    refreshAgents();
+  };
 
   // Auto-hide success message after 4 seconds
   useEffect(() => {
@@ -193,11 +370,8 @@ export default function AdminPanel() {
   useEffect(() => {
     const socket = createSocket('admin-dashboard');
     
-    console.log('Admin dashboard socket setup');
-    
     // Listen for new parcels being created
     const handleParcelCreated = (newParcel) => {
-      console.log('Admin received new parcel:', newParcel);
       setParcels(prevParcels => [newParcel, ...prevParcels]);
       
       // Refresh metrics when new parcel is created
@@ -208,7 +382,6 @@ export default function AdminPanel() {
     
     // Listen for parcel updates
     const handleParcelUpdate = (data) => {
-      console.log('Admin received parcel update:', data);
       setParcels(prevParcels => 
         prevParcels.map(p => 
           p._id === data.id ? { ...p, status: data.status, agent: data.agent || p.agent } : p
@@ -223,7 +396,6 @@ export default function AdminPanel() {
     
     // Listen for location updates
     const handleLocationUpdate = (data) => {
-      console.log('Admin received location update:', data);
       setParcels(prevParcels =>
         prevParcels.map(p =>
           p._id === data.id || p._id === data.parcelId
@@ -259,6 +431,9 @@ export default function AdminPanel() {
 
   return (
     <div className="space-y-8 animate-fade-in">
+      {showAddAgent && (
+        <AddAgentModal onClose={() => setShowAddAgent(false)} onCreated={upsertUser} />
+      )}
       {/* Success Message Toast */}
       {successMessage && (
         <div className="fixed top-20 right-4 z-50 animate-fade-in">
@@ -326,23 +501,28 @@ export default function AdminPanel() {
               </svg>
               {t.users}
             </h3>
-            <span className="badge bg-surface-100 text-surface-600 border-surface-200">
-              {users.length} total
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="badge bg-surface-100 text-surface-600 border-surface-200">
+                {users.length}
+              </span>
+              <button onClick={() => setShowAddAgent(true)} className="btn-primary btn-sm">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                {t.addAgent}
+              </button>
+            </div>
           </div>
           <div className="max-h-96 overflow-auto no-scrollbar">
             <div className="space-y-3">
               {users.map(u => (
-                <div key={u._id} className="flex items-center gap-3 p-3 rounded-xl bg-surface-50 hover:bg-surface-100 transition-colors">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500 to-brand-600 flex items-center justify-center text-white font-semibold">
-                    {u.name?.charAt(0)?.toUpperCase() || '?'}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-surface-900 truncate">{u.name}</p>
-                    <p className="text-sm text-surface-500 truncate">{u.email}</p>
-                  </div>
-                  <RoleBadge role={u.role} />
-                </div>
+                <UserRow
+                  key={u._id}
+                  user={u}
+                  isSelf={u._id === (currentUser?._id || currentUser?.id)}
+                  onChanged={upsertUser}
+                  onNotify={setSuccessMessage}
+                />
               ))}
             </div>
           </div>
@@ -406,7 +586,7 @@ export default function AdminPanel() {
                           {p.paymentType === 'COD' && <span className="text-surface-500 ml-1">(৳{p.codAmount})</span>}
                         </span>
                       </td>
-                      <td>{agents.find(a => a._id === (p.agent?._id || p.agent))?.name || '—'}</td>
+                      <td>{p.agent?.name || agents.find(a => a._id === (p.agent?._id || p.agent))?.name || '—'}</td>
                       <td>
                         <AssignmentCell 
                           parcel={p} 

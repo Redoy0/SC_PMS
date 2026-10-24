@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import { useAuth } from '../context/AuthContext.jsx';
 import { socket } from '../socket';
@@ -10,6 +10,7 @@ import 'leaflet-routing-machine/dist/leaflet-routing-machine.css';
 
 export default function TrackPublicParcel() {
   const { user, logout } = useAuth();
+  const [searchParams] = useSearchParams();
   const [trackingCode, setTrackingCode] = useState('');
   const [parcel, setParcel] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -93,15 +94,14 @@ export default function TrackPublicParcel() {
     }
   }, [ensureMap, clearRouteAndMarkers, geocodeAddress]);
 
-  const onTrack = async (e) => {
-    e.preventDefault();
-    const code = trackingCode.trim();
+  const trackCode = async (rawCode) => {
+    const code = rawCode.trim();
     if (!code) return;
     setLoading(true);
     setError('');
     setParcel(null);
     try {
-      const res = await api.get(`/parcels/track/${code}`);
+      const res = await api.get(`/parcels/track/${encodeURIComponent(code.toUpperCase())}`);
       const data = res.data;
       if (data?.message) {
         setError(data.message);
@@ -114,6 +114,21 @@ export default function TrackPublicParcel() {
       setLoading(false);
     }
   };
+
+  const onTrack = (e) => {
+    e.preventDefault();
+    trackCode(trackingCode);
+  };
+
+  // Landing page search links here as /track-parcel?code=XXXX
+  useEffect(() => {
+    const initial = searchParams.get('code');
+    if (initial) {
+      setTrackingCode(initial);
+      trackCode(initial);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (!parcel) return;
@@ -147,14 +162,18 @@ export default function TrackPublicParcel() {
       }
     };
 
+    // Proving the tracking code lets an anonymous socket join this parcel's room
+    const subscription = { parcelId: parcel._id, trackingCode: parcel.trackingCode };
+    socket.emit('subscribe:parcel', subscription);
     socket.on('parcel:update', handleParcelUpdate);
     socket.on('parcel:location', handleLocationUpdate);
 
     return () => {
+      socket.emit('unsubscribe:parcel', subscription);
       socket.off('parcel:update', handleParcelUpdate);
       socket.off('parcel:location', handleLocationUpdate);
     };
-  }, [parcel?._id]);
+  }, [parcel?._id, parcel?.trackingCode]);
 
   useEffect(() => {
     return () => {
