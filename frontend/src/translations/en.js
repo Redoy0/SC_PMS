@@ -86,7 +86,7 @@ export const en = {
   somethingWentWrong: 'Something went wrong',
   
   // Placeholders
-  johnDoe: 'Sabbir Ahamed',
+  johnDoe: 'Your full name',
   emailPlaceholder: 'you@example.com',
   passwordPlaceholder: '••••••••',
   
