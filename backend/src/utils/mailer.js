@@ -8,10 +8,14 @@ const SMTP_SECURE = process.env.MAIL_SECURE ? process.env.MAIL_SECURE === 'true'
 const SMTP_FROM = process.env.MAIL_FROM || SMTP_USER;
 const SMTP_FROM_NAME = process.env.MAIL_FROM_NAME || 'Smart Courier Management System';
 const isProduction = process.env.NODE_ENV === 'production';
+// Brevo's HTTPS API, for hosts that block outbound SMTP ports (e.g. Render's free plan).
+// When set it takes precedence over SMTP; MAIL_FROM must be a sender verified in Brevo.
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const isSmtpConfigured = Boolean(SMTP_USER && SMTP_PASS);
 
-export const isMailConfigured = Boolean(SMTP_USER && SMTP_PASS);
+export const isMailConfigured = Boolean(BREVO_API_KEY || isSmtpConfigured);
 
-export const transporter = isMailConfigured
+export const transporter = isSmtpConfigured && !BREVO_API_KEY
 	? nodemailer.createTransport({
 		host: SMTP_HOST,
 		port: SMTP_PORT,
@@ -53,6 +57,22 @@ async function send({ to, subject, text, html, devNote }) {
 		if (isProduction) throw new MailNotConfiguredError('Email service is not configured');
 		// Local development without SMTP: print what would have been sent
 		console.log(`\n[mail:dev] To: ${to}\n[mail:dev] Subject: ${subject}\n[mail:dev] ${devNote || text}\n`);
+		return;
+	}
+	if (BREVO_API_KEY) {
+		const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+			method: 'POST',
+			headers: { 'api-key': BREVO_API_KEY, 'Content-Type': 'application/json', Accept: 'application/json' },
+			body: JSON.stringify({
+				sender: { name: SMTP_FROM_NAME, email: SMTP_FROM },
+				to: [{ email: to }],
+				subject,
+				textContent: text,
+				htmlContent: html
+			}),
+			signal: AbortSignal.timeout(15000)
+		});
+		if (!res.ok) throw new Error(`Brevo API error ${res.status}: ${await res.text()}`);
 		return;
 	}
 	await transporter.sendMail({ from: `${SMTP_FROM_NAME} <${SMTP_FROM}>`, to, subject, text, html });

@@ -22,7 +22,7 @@ const RESET_TTL_MIN = 30;
 const verificationRequired = (process.env.EMAIL_VERIFICATION || 'required').toLowerCase() !== 'off';
 
 if (verificationRequired && !isMailConfigured && process.env.NODE_ENV === 'production') {
-	console.warn('[auth] EMAIL_VERIFICATION is required but MAIL_USER/MAIL_PASS are not set: new sign-ups will fail.');
+	console.warn('[auth] EMAIL_VERIFICATION is required but neither BREVO_API_KEY nor MAIL_USER/MAIL_PASS is set: new sign-ups will fail.');
 }
 
 // Used to keep response time the same whether or not an email exists
