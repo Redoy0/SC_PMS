@@ -1,0 +1,59 @@
+{
+  "captured": "2026-10-19T16:30:17.364Z",
+  "viewport": "1440x900",
+  "note": "Local run against in-memory MongoDB with demonstration data; agent geolocation fixed at 23.8223, 90.3654 (simulated).",
+  "shots": [
+    {
+      "file": "landing.png",
+      "url": "/"
+    },
+    {
+      "file": "login.png",
+      "url": "/login"
+    },
+    {
+      "file": "register.png",
+      "url": "/register"
+    },
+    {
+      "file": "public-tracking.png",
+      "url": "/track-parcel?code=ZA3BKYHLBT"
+    },
+    {
+      "file": "landing-bn.png",
+      "url": "/"
+    },
+    {
+      "file": "customer-dashboard.png",
+      "url": "/app"
+    },
+    {
+      "file": "customer-qr.png",
+      "url": "/customer/parcel/qr/6ad6454a09fb049c54990c9c"
+    },
+    {
+      "file": "customer-parcel-detail.png",
+      "url": "/customer/parcel/6ad6454a09fb049c54990c98"
+    },
+    {
+      "file": "agent-dashboard.png",
+      "url": "/agent"
+    },
+    {
+      "file": "admin-dashboard.png",
+      "url": "/admin"
+    },
+    {
+      "file": "admin-agent-tracking.png",
+      "url": "/admin/tracking"
+    },
+    {
+      "file": "agent-parcel-view.png",
+      "url": "/parcel/6ad6454a09fb049c54990c98"
+    },
+    {
+      "file": "agent-pickup-confirm.png",
+      "url": "/agent/parcel/6ad6454a09fb049c54990c9c/pickup-confirm"
+    }
+  ]
+}

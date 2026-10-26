@@ -1,0 +1,162 @@
+% ===================================================================
+% Shared visual style for all SCPMS diagrams (TikZ).
+% One palette is used everywhere so that each role / tier keeps the same
+% colour in every figure:
+%   customer = blue, agent = green, admin = purple, public = amber,
+%   core system = indigo, real-time = cyan, data = teal, external = slate.
+% ===================================================================
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart,
+  shapes.symbols,shapes.misc,fit,calc,backgrounds,shadows}
+
+\definecolor{cCust}{HTML}{2563EB}
+\definecolor{cAgent}{HTML}{059669}
+\definecolor{cAdmin}{HTML}{7C3AED}
+\definecolor{cPub}{HTML}{D97706}
+\definecolor{cCore}{HTML}{4F46E5}
+\definecolor{cSock}{HTML}{0891B2}
+\definecolor{cData}{HTML}{0F766E}
+\definecolor{cExt}{HTML}{64748B}
+\definecolor{cRed}{HTML}{DC2626}
+\definecolor{cOk}{HTML}{16A34A}
+\definecolor{cInk}{HTML}{1E293B}
+\definecolor{cMuted}{HTML}{94A3B8}
+\definecolor{cNote}{HTML}{FEF3C7}
+\definecolor{cNoteLine}{HTML}{D97706}
+
+\tikzset{
+  % --- generic shadows and boxes
+  shadowed/.style={drop shadow={shadow xshift=0.7mm, shadow yshift=-0.7mm, opacity=0.18, fill=black}},
+  card/.style={draw=#1, line width=0.9pt, rounded corners=5pt, fill=#1!8, align=center,
+    text=cInk, inner sep=5pt, shadowed},
+  gcard/.style={draw=#1!75!black, line width=0.8pt, rounded corners=5pt, top color=#1!70,
+    bottom color=#1, text=white, font=\bfseries, align=center, inner sep=6pt, shadowed},
+  pill/.style={draw=#1, line width=0.9pt, rounded corners=9pt, fill=#1!12, align=center,
+    text=cInk, inner sep=4pt},
+  gpill/.style={draw=#1!75!black, line width=0.8pt, rounded corners=10pt, top color=#1!65,
+    bottom color=#1, text=white, font=\bfseries, align=center, inner sep=5pt, shadowed},
+  panel/.style={draw=#1!55, line width=1pt, rounded corners=8pt, fill=#1!4, inner sep=8pt},
+  tag/.style={fill=#1, text=white, font=\scriptsize\bfseries, rounded corners=3pt,
+    inner sep=3pt, align=center},
+  % header card: coloured title bar, white body
+  hcard/.style={rectangle split, rectangle split parts=2, draw=#1!80!black, line width=1pt,
+    rounded corners=4pt, rectangle split part fill={#1, #1!4}, align=left, inner sep=4pt},
+  % labels sitting on arrows
+  elabel/.style={font=\scriptsize, fill=white, inner sep=1.6pt, rounded corners=2pt,
+    align=center, text=cInk},
+  % arrows
+  flow/.style={-{Stealth[length=2.6mm,width=2.1mm]}, line width=1.05pt, draw=#1},
+  flow/.default=cInk,
+  bflow/.style={{Stealth[length=2.4mm,width=2mm]}-{Stealth[length=2.4mm,width=2mm]},
+    line width=1.05pt, draw=#1},
+  bflow/.default=cInk,
+  rtflow/.style={-{Stealth[length=2.6mm,width=2.1mm]}, line width=1.1pt, draw=cSock,
+    dash pattern=on 4pt off 2pt},
+  % sticky notes
+  note/.style={draw=cNoteLine, fill=cNote, line width=0.6pt, rounded corners=2pt,
+    font=\tiny, align=left, inner sep=3pt, text=cInk},
+  % numbered step badges
+  step/.style={circle, fill=#1, text=white, font=\tiny\bfseries, inner sep=1.2pt,
+    minimum size=4.2mm},
+  step/.default=cCore,
+}
+
+% ------------------------------------------------------------------
+% Sequence-diagram helpers (used inside tikzpicture)
+%   \seqhead{x}{name}{colour}{label}{bottom y}  participant header + lifeline
+%   \seqact{x}{y top}{y bottom}{colour}         activation bar
+%   \seqmsg[colour]{x1}{x2}{y}{n}{label}        numbered request message
+%   \seqret[colour]{x1}{x2}{y}{label}           dashed response
+%   \seqevt{x1}{x2}{y}{label}                   real-time (socket) event
+%   \seqphase{x1}{x2}{y top}{y bottom}{colour}{title}  background phase band
+%   \seqnote{x}{y}{text}                        sticky note (anchor north west)
+% ------------------------------------------------------------------
+\newcommand{\seqhead}[5]{%
+  \node[gcard=#3, minimum width=2.25cm, minimum height=0.8cm, font=\scriptsize\bfseries] (#2) at (#1,0) {#4};
+  \draw[cMuted, line width=0.7pt, dash pattern=on 3pt off 2pt] (#1,-0.42) -- (#1,#5);}
+\newcommand{\seqact}[4]{%
+  \fill[#4!25, draw=#4, line width=0.6pt] ($(#1,#2)+(-0.09,0)$) rectangle ($(#1,#3)+(0.09,0)$);}
+\newcommand{\seqmsg}[6][cInk]{%
+  \draw[flow=#1] (#2,#4) -- node[above=1pt, font=\scriptsize, text=cInk, align=center, inner sep=1pt]{#6} (#3,#4);
+  \node[step=#1] at ($(#2,#4)+({0.32*sign(#3-#2)},-0.24)$) {#5};}
+\newcommand{\seqret}[5][cExt]{%
+  \draw[-{Stealth[length=2.3mm,width=1.9mm,open]}, line width=0.9pt, draw=#1, dash pattern=on 3pt off 2pt]
+    (#2,#4) -- node[above=1pt, font=\scriptsize, text=cInk, align=center, inner sep=1pt]{#5} (#3,#4);}
+\newcommand{\seqevt}[4]{%
+  \draw[rtflow] (#1,#3) -- node[above=1pt, font=\scriptsize\bfseries, text=cSock, align=center, inner sep=1pt]{#4} (#2,#3);}
+\newcommand{\seqphase}[6]{%
+  \begin{scope}[on background layer]
+    \fill[#5!7, rounded corners=4pt] (#1,#3) rectangle (#2,#4);
+    \fill[#5, rounded corners=4pt] (#1,#3) rectangle (#1+0.42,#4);
+    \node[text=white, font=\tiny\bfseries, rotate=90] at ($(#1+0.21,#3)!0.5!(#1+0.21,#4)$) {#6};
+  \end{scope}}
+% icon on top of a card: puts vertical space before the card text
+\newcommand{\iconspace}[1][7mm]{\mbox{}\\[#1]}
+\newcommand{\seqnote}[3]{\node[note, anchor=north west] at (#1,#2) {#3};}
+
+% ------------------------------------------------------------------
+% Icons (pics). Usage: \pic at (x,y) {person=cCust};
+% ------------------------------------------------------------------
+\tikzset{
+  pics/person/.style={code={
+    \fill[#1] (0,0.40) circle (0.17);
+    \fill[#1] (-0.32,-0.12) .. controls (-0.32,0.20) and (0.32,0.20) .. (0.32,-0.12)
+      -- cycle;
+  }},
+  pics/db/.style={code={
+    \fill[#1!25, draw=#1, line width=0.8pt] (-0.36,0.28) -- (-0.36,-0.28)
+      arc (180:360:0.36 and 0.12) -- (0.36,0.28) arc (0:180:0.36 and 0.12) -- cycle;
+    \draw[#1, line width=0.8pt, fill=#1!45] (0,0.28) ellipse (0.36 and 0.12);
+    \draw[#1, line width=0.6pt] (-0.36,0.06) arc (180:360:0.36 and 0.12);
+    \draw[#1, line width=0.6pt] (-0.36,-0.12) arc (180:360:0.36 and 0.12);
+  }},
+  pics/server/.style={code={
+    \foreach \y in {0.18,-0.12} {
+      \fill[#1!20, draw=#1, line width=0.7pt, rounded corners=1.5pt]
+        (-0.38,\y-0.12) rectangle (0.38,\y+0.12);
+      \fill[#1] (0.22,\y) circle (0.035); \fill[#1] (0.30,\y) circle (0.035);
+      \draw[#1, line width=0.6pt] (-0.28,\y) -- (0.05,\y);
+    }
+  }},
+  pics/mail/.style={code={
+    \fill[#1!18, draw=#1, line width=0.8pt, rounded corners=1pt] (-0.36,-0.24) rectangle (0.36,0.24);
+    \draw[#1, line width=0.8pt, line join=round] (-0.36,0.24) -- (0,-0.02) -- (0.36,0.24);
+  }},
+  pics/pin/.style={code={
+    \fill[#1] (0,-0.32) .. controls (-0.10,-0.14) and (-0.26,0.0) .. (-0.26,0.14)
+      arc (180:0:0.26) .. controls (0.26,0.0) and (0.10,-0.14) .. (0,-0.32) -- cycle;
+    \fill[white] (0,0.14) circle (0.10);
+  }},
+  pics/browser/.style={code={
+    \fill[white, draw=#1, line width=0.8pt, rounded corners=2pt] (-0.42,-0.30) rectangle (0.42,0.30);
+    \fill[#1, rounded corners=2pt] (-0.42,0.30) -- (-0.42,0.16) -- (0.42,0.16) -- (0.42,0.30) -- cycle;
+    \foreach \x in {-0.33,-0.25,-0.17} \fill[white] (\x,0.23) circle (0.025);
+    \fill[#1!30] (-0.32,0.06) rectangle (0.10,-0.02);
+    \fill[#1!20] (-0.32,-0.08) rectangle (0.32,-0.20);
+  }},
+  pics/phone/.style={code={
+    \fill[#1!15, draw=#1, line width=0.8pt, rounded corners=3pt] (-0.18,-0.32) rectangle (0.18,0.32);
+    \fill[white] (-0.13,-0.20) rectangle (0.13,0.24);
+    \fill[#1] (0,-0.26) circle (0.03);
+  }},
+  pics/lock/.style={code={
+    \draw[#1, line width=1pt] (-0.10,0.02) -- (-0.10,0.12) arc (180:0:0.10) -- (0.10,0.02);
+    \fill[#1, rounded corners=1pt] (-0.16,-0.18) rectangle (0.16,0.04);
+    \fill[white] (0,-0.07) circle (0.035);
+  }},
+  pics/mapicon/.style={code={
+    \fill[#1!15, draw=#1, line width=0.7pt, line join=round]
+      (-0.40,-0.24) -- (-0.40,0.24) -- (-0.13,0.30) -- (0.13,0.22) -- (0.40,0.28)
+      -- (0.40,-0.20) -- (0.13,-0.28) -- (-0.13,-0.20) -- cycle;
+    \draw[#1, line width=0.6pt] (-0.13,0.30) -- (-0.13,-0.20) (0.13,0.22) -- (0.13,-0.28);
+    \draw[cRed, line width=0.9pt] (-0.30,-0.10) .. controls (-0.05,0.15) and (0.05,-0.15) .. (0.30,0.12);
+  }},
+  pics/qr/.style={code={
+    \fill[white, draw=#1, line width=0.7pt] (-0.28,-0.28) rectangle (0.28,0.28);
+    \foreach \px/\py in {-0.20/0.20, 0.20/0.20, -0.20/-0.20} {
+      \fill[#1] (\px-0.07,\py-0.07) rectangle (\px+0.07,\py+0.07);
+      \fill[white] (\px-0.045,\py-0.045) rectangle (\px+0.045,\py+0.045);
+      \fill[#1] (\px-0.025,\py-0.025) rectangle (\px+0.025,\py+0.025); }
+    \foreach \x/\y in {0.04/0.02,0.12/-0.08,-0.02/-0.14,0.18/-0.18,0.06/-0.22,-0.06/0.06} {
+      \fill[#1] (\x-0.025,\y-0.025) rectangle (\x+0.025,\y+0.025); }
+  }},
+}

@@ -1,0 +1,50 @@
+% Layered architecture (derived from frontend/src and backend/src structure)
+\begin{tikzpicture}[font=\small, >=Stealth,
+  comp/.style={card=#1, minimum height=1.05cm, text width=2.0cm, font=\scriptsize},
+  wide/.style={card=#1, minimum height=0.8cm, font=\scriptsize}]
+
+% ================= CLIENT TIER =================
+\node[panel=cCust, minimum width=15.2cm, minimum height=2.5cm] (client) at (0.3,0) {};
+\node[tag=cCust, rotate=90, minimum width=2.3cm] at (-7.05,0) {CLIENT};
+\node[font=\footnotesize\bfseries, text=cCust, anchor=north west] at (-6.65,1.15) {Browser \,--\, React 19 single-page application (Vite build), English / Bangla};
+\pic at (-6.0,-0.15) {browser=cCust};
+\pic at (-6.0,-0.95) {phone=cCust};
+\node[comp=cCust] (pages) at (-3.85,-0.25) {\textbf{Role pages}\\customer, agent,\\admin, public};
+\node[comp=cCust] (guards) at (-1.25,-0.25) {\textbf{Route guards}\\role-based\\redirects};
+\node[comp=cCust] (ctx) at (1.35,-0.25) {\textbf{Contexts}\\auth (in-memory\\token), language};
+\node[comp=cCust] (apijs) at (3.95,-0.25) {\textbf{api.js}\\axios + silent\\token refresh};
+\node[comp=cSock] (sock) at (6.55,-0.25) {\textbf{socket.js}\\Socket.IO client\\(JWT handshake)};
+
+% ================= EDGE TIER =================
+\node[panel=cExt, minimum width=15.2cm, minimum height=1.25cm] (edge) at (0.3,-2.1) {};
+\node[tag=cExt, rotate=90, minimum width=1.1cm] at (-7.05,-2.1) {EDGE};
+\node[font=\scriptsize, text=cInk, align=center, text width=13.4cm] at (0.6,-2.1) {\textbf{Vercel / Netlify rewrite} (production) or \textbf{Vite proxy} (development): same-origin \code{/api/*} $\rightarrow$ backend,\\so the refresh cookie stays first-party; the hosting layer also adds security headers};
+
+% ================= SERVER TIER =================
+\node[panel=cCore, minimum width=15.2cm, minimum height=5.1cm] (server) at (0.3,-5.4) {};
+\node[tag=cCore, rotate=90, minimum width=4.9cm] at (-7.05,-5.4) {SERVER};
+\node[font=\footnotesize\bfseries, text=cCore, anchor=north west] at (-6.65,-2.95) {Node.js \,--\, Express 4 REST API and Socket.IO 4 in one process};
+\pic at (-6.0,-4.4) {server=cCore};
+\node[wide=cCore, text width=12.0cm] (mw) at (0.9,-3.95) {\textbf{Middleware chain:} helmet $\rightarrow$ CORS allow-list $\rightarrow$ JSON 100\,kB $\rightarrow$ cookies $\rightarrow$ NoSQL sanitiser $\rightarrow$ rate limits $\rightarrow$ auth / role guards};
+\node[wide=cCore, text width=12.0cm] (routes) at (0.9,-4.95) {\textbf{Routes under} \code{/api/}: auth \,$\cdot$\, parcels \,$\cdot$\, users \,$\cdot$\, assignments \,$\cdot$\, analytics \,$\cdot$\, geocode};
+\node[wide=cCore, text width=5.7cm] (ctrl) at (-2.25,-6.05) {\textbf{Controllers} \,--\, validation and lifecycle rules (auth, parcel, analytics)};
+\node[wide=cSock, text width=5.7cm] (svc) at (4.05,-6.05) {\textbf{Real-time services} \,--\, socket auth, rooms, scoped emission, sessions};
+\node[wide=cData, text width=5.7cm] (models) at (-2.25,-7.15) {\textbf{Mongoose models} \,--\, User, Parcel, Session};
+\node[wide=cExt, text width=5.7cm] (utils) at (4.05,-7.15) {\textbf{Utilities} \,--\, JWT, random tokens, validation, mailer};
+
+\draw[flow=cCore] (mw) -- (routes);
+\draw[flow=cCore] (routes.south -| ctrl) -- (ctrl);
+\draw[flow=cCore] (ctrl) -- (models);
+\draw[flow=cCore] (ctrl) -- (svc);
+
+% ================= DATA / EXTERNAL =================
+\pic at (-2.25,-9.05) {db=cData};
+\node[font=\footnotesize\bfseries, text=cData] at (-2.25,-9.7) {MongoDB};
+\node[card=cExt, font=\scriptsize, minimum width=4.8cm] (ext) at (4.05,-9.2) {\textbf{External services}\\SMTP e-mail \,$\cdot$\, Photon / Nominatim};
+
+\draw[flow=cData] (models.south) -- (-2.25,-8.67);
+\draw[flow=cExt] (utils.south) -- (ext.north);
+\draw[flow=cCust] (0.3,-1.25) -- (0.3,-1.47);
+\draw[flow=cExt] (0.3,-2.73) -- (0.3,-2.85);
+\draw[rtflow] (sock.east) -- ++(0.85,0) |- node[pos=0.25, right, font=\scriptsize\bfseries, text=cSock, align=left]{WebSocket\\direct to\\backend} (svc.east);
+\end{tikzpicture}

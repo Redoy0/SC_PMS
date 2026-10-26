@@ -21,3 +21,7 @@ server/dist/
 .vscode/
 .DS_Store
 .idea/
+
+report
+report.zip
+docs

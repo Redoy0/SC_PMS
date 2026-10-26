@@ -1,0 +1,80 @@
+\section{Overview}
+
+This chapter summarises the project, assesses each objective against the evidence of Chapter~\ref{chap:results}, answers the engineering questions, and discusses contributions, lessons learned and future work. The limitations of the work are stated in Chapter~\ref{chap:limits}.
+
+\section{Summary of the Project}
+
+The project set out to address the lack of parcel visibility, unclear responsibility, missing accountability and limited operational insight in manually coordinated courier operations. The resulting system, \scpms, is a MERN web application with Socket.IO real-time messaging. Customers book and follow parcels, delivery agents confirm pickups with a QR scan and share their location, administrators assign work and monitor operations, and anyone holding a tracking code can follow a parcel without seeing personal data. The design centres on a server-enforced six-state lifecycle with an embedded audit trail, room-scoped real-time events and a layered security design. The implementation was evaluated with static analysis, a production build, a dependency audit, 66 executed black-box tests and screenshots of the running system.
+
+\section{Achievement of Objectives}
+
+Table~\ref{tab:obj-achieved} assesses the objectives of Table~\ref{tab:objectives}.
+
+\begin{table}[htbp]
+\centering
+\caption{Assessment of objectives against evidence}
+\label{tab:obj-achieved}
+\small
+\begin{tabularx}{\textwidth}{@{}p{0.6cm}P{2.3cm}LP{2.6cm}@{}}
+\toprule
+\textbf{ID} & \textbf{Assessment} & \textbf{Evidence and qualification} & \textbf{Open issues} \\
+\midrule
+O1 & Achieved & Verification, lockout, rotation with reuse detection and revocation all verified by tests (T05--T22, T61--T62) & Password policy deviates from NIST (F12) \\
+O2 & Achieved & Role and ownership checks held in every attempted violation (Section~\ref{sec:sec-tests}) & Client guards are convenience only, as intended \\
+O3 & Largely achieved & Lifecycle, locking of final states and audit trail verified (T42--T56) & Forward skips allowed (F1) \\
+O4 & Achieved & Events reach authorised watchers only; public view is reduced (T34, T43, T49, T51) & Scalability not tested (F11) \\
+O5 & Partly achieved & QR identification at pickup and route maps work in the running system & No delivery-side confirmation; QR is not cryptographic proof; map service dependencies (F2, F3) \\
+O6 & Achieved within stated scope & Metrics, CSV/PDF export and user management verified (T24, T57--T62) & Analytics deliberately basic \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Answers to the Engineering Questions}
+
+\textbf{EQ1: role-appropriate visibility of a shared lifecycle.} A single parcel record, accessed through one API that applies role checks and ownership checks, gives each role a consistent but filtered view of the same lifecycle. Because all lifecycle rules live in one server function, every client sees the same states and transitions, and the embedded history provides a common account of what happened. Tests T31, T32, T34 and T54 confirm that customers, agents, administrators and public viewers each see exactly their permitted portion.
+
+\textbf{EQ2: real-time propagation without disclosure.} Combining authenticated sockets, per-user and per-role rooms, and parcel rooms that require ownership or proof of the tracking code makes it possible to push changes immediately while confining each event to its legitimate audience. Agent positions are accepted only from the agent concerned and forwarded only to watchers of that agent's active parcels. Tests T43, T49 and T51 confirm both delivery to authorised sockets and non-delivery to others.
+
+\textbf{EQ3: satisfaction of requirements.} All 66 executed test cases passed. These cover every functional requirement that can be exercised through the API, together with the security, privacy and robustness requirements. The remaining requirements (QR scanning, status e-mail delivery, the bilingual interface and maps) were verified by inspection of the code and the running interface, not by automated assertions. Usability, scalability and behaviour in the field were not evaluated. The requirements are therefore satisfied for functional correctness and security on a single machine, with fourteen documented defects or findings, most of them minor.
+
+\section{Key Technical Contributions}
+
+\begin{enumerate}
+  \item A complete, documented courier management system for a single operator, covering registration through delivery with three role-specific interfaces, public tracking and a bilingual user interface.
+  \item A real-time design in which no event is broadcast globally and anonymous viewers must prove knowledge of a tracking code, so that live tracking does not leak data across customers.
+  \item A session design that applies refresh-token rotation with reuse detection, together with \code{tokenVersion} revocation, in a small web system, verified by adversarial tests.
+  \item A reproducible evaluation package: a black-box API and socket test harness that runs the unmodified backend against a disposable database, a screenshot capture script, and generated result tables. Future maintainers can rerun all of it.
+\end{enumerate}
+
+\section{Lessons Learned}
+
+\begin{itemize}
+  \item \textbf{Authorisation belongs on the server and next to the data.} The most serious early defects (role escalation at sign-up, IDOR on parcel reads, unauthenticated assignment and deletion) were fixed by moving checks into route guards \emph{and} controllers. The tests show that both layers are needed.
+  \item \textbf{Real-time features need the same care as REST.} Socket messages were initially trusted and broadcast globally. Treating them as untrusted input and scoping them to rooms was as important as securing the HTTP API.
+  \item \textbf{Documentation drifts unless it is checked against code.} The audit for this report found several documents that described planned features as implemented. Writing claims only from code and executed tests produced a smaller but defensible account.
+  \item \textbf{Evidence is cheap once automated.} A single harness that starts the real system against a disposable database gave repeatable evidence for dozens of requirements in under two minutes.
+\end{itemize}
+
+\section{Recommendations for Future Work}
+
+\textbf{Short term (corrective).}
+\begin{enumerate}
+  \item Resolve the defects in Table~\ref{tab:defects}: remove the customer debug control, fix the currency symbol, consolidate the two public tracking pages, correct the QR page wording, guard \code{/parcel/:id/route}, and clear the lint errors.
+  \item Decide whether agents must pass through every lifecycle state and enforce the decision in \code{transitionError}.
+  \item Store geocoded coordinates on the parcel at booking and recompute routes only when endpoints change. Adopt a length-based password policy with breached-password screening.
+  \item Add the test harness to continuous integration and extend it with backend unit tests and frontend component tests.
+\end{enumerate}
+
+\textbf{Medium term (functional).}
+\begin{enumerate}
+  \item Delivery confirmation using a signed, single-use code (for example a one-time code sent to the recipient or a signed QR token) so that a delivery requires evidence from the recipient.
+  \item Persistent location history and a shared Socket.IO adapter (for example Redis) to survive restarts and allow horizontal scaling.
+  \item Richer analytics: on-time rate, failure reasons, per-agent workload and time-series charts.
+  \item SMS notifications through a local gateway, and a progressive web app or native companion app for agents with background location.
+\end{enumerate}
+
+\textbf{Research directions.} Once real operational data is available, the system could support the optimisation problems surveyed in the literature \cite{boysen2021lastmile,savelsbergh2016city}, such as automatic agent assignment, route optimisation and data-driven delivery-time prediction. It could also support a controlled field study measuring whether live visibility reduces customer enquiries and failed deliveries.
+
+\section{Final Conclusion}
+
+\scpms{} demonstrates that a small team can build, with widely used open-source web technologies, a courier management system in which responsibilities are explicit, every status change is recorded, live tracking is available to the right people and only to them, and the security mechanisms withstand the attacks most common in web applications. The evaluation supports these claims for functional correctness and security on a single machine, and it states plainly what remains unproven: usability, scalability and operational benefit in the field. The system is a sound foundation for those next steps, but it is not yet a production-ready, independently validated platform.

@@ -1,0 +1,44 @@
+% Deployment view (derived from backend/render.yaml, frontend/vercel.json, netlify.toml,
+% frontend/.env.production). Whether the deployment is currently live was not verified.
+\begin{tikzpicture}[font=\scriptsize, >=Stealth,
+  box/.style={card=#1, minimum width=3.8cm, minimum height=1.9cm, align=center, text width=3.5cm},
+  svc/.style={card=#1, minimum width=2.9cm, minimum height=1.5cm, align=center, text width=2.6cm}]
+
+% ---------- zones
+\node[panel=cCust, minimum width=4.6cm, minimum height=6.4cm] at (0,-1.15) {};
+\node[tag=cCust] at (0,1.75) {CLIENT DEVICES};
+\node[panel=cExt, minimum width=4.6cm, minimum height=3.1cm] at (5.8,0.5) {};
+\node[tag=cExt] at (5.8,1.75) {STATIC HOSTING / EDGE};
+\node[panel=cCore, minimum width=4.6cm, minimum height=3.1cm] at (11.6,0.5) {};
+\node[tag=cCore] at (11.6,1.75) {APPLICATION TIER};
+\node[panel=cData, minimum width=10.4cm, minimum height=2.6cm] at (8.7,-3.05) {};
+\node[tag=cData, anchor=west] at (3.65,-4.35) {DATA AND THIRD-PARTY SERVICES};
+
+% ---------- main nodes (icons sit in the reserved top area of each card)
+\node[box=cCust] (browser) at (0,0.25) {\iconspace[8mm]\textbf{Browser}\\desktop or phone};
+\pic at (-0.5,0.78) {browser=cCust}; \pic at (0.6,0.78) {phone=cCust};
+\node[box=cExt] (cdn) at (5.8,0.25) {\iconspace[8mm]\textbf{Vercel / Netlify}\\SPA files, \code{/api/*} rewrite,\\security headers};
+\node[cloud, cloud puffs=10, aspect=2, draw=cExt, fill=cExt!20, line width=0.8pt, minimum width=1.2cm, minimum height=0.65cm] at (5.8,0.85) {};
+\node[box=cCore] (render) at (11.6,0.25) {\iconspace[8mm]\textbf{Render web service}\\Express + Socket.IO,\\health check \code{/health}};
+\pic at (11.6,0.82) {server=cCore};
+
+\node[svc=cData] (db) at (5.6,-3.25) {\iconspace[7mm]\textbf{MongoDB}\\\code{MONGODB_URI}};
+\pic at (5.6,-2.88) {db=cData};
+\node[svc=cExt] (smtp) at (8.7,-3.25) {\iconspace[7mm]\textbf{SMTP}\\Gmail (app password)};
+\pic at (8.7,-2.86) {mail=cExt};
+\node[svc=cExt] (geo) at (11.8,-3.25) {\iconspace[7mm]\textbf{Geocoding}\\Photon / Nominatim};
+\pic at (11.8,-2.82) {pin=cRed};
+\node[box=cExt, minimum height=1.6cm] (maps) at (0,-3.25) {\iconspace[7mm]\textbf{Map services}\\OSM tiles, OSRM demo, Google Maps JS};
+\pic at (0,-2.82) {mapicon=cExt};
+
+% ---------- connections
+\draw[flow=cCust] (browser.east) -- node[elabel, above=2pt]{HTTPS: pages\\and \code{/api}} (cdn.west);
+\draw[flow=cExt] (cdn.east) -- node[elabel, above=2pt]{proxied\\\code{/api}} (render.west);
+\draw[rtflow] ($(browser.north east)+(-0.5,0.25)$) -- ++(0,1.25) -| node[pos=0.25, above, font=\scriptsize\bfseries, text=cSock]{WebSocket connection directly to the backend (\code{VITE_SOCKET_URL})} ($(render.north east)+(-0.25,0.25)$);
+\draw[bflow=cData] ($(render.south)+(-1.2,0)$) -- (db.north east);
+\draw[flow=cExt] ($(render.south)+(-0.3,0)$) -- (smtp.north);
+\draw[bflow=cExt] ($(render.south)+(0.3,0)$) -- (geo.north);
+\draw[bflow=cExt] (browser.south) -- (maps.north);
+
+\node[font=\tiny, text=cExt, anchor=north west] at (-2.3,-4.75) {Configuration as defined in the project files; whether this deployment is currently live was not verified.};
+\end{tikzpicture}

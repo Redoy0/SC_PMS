@@ -1,0 +1,182 @@
+% ===================================================================
+% Final Defense Report: Smart Courier and Parcel Management System
+% Adapted from the Uttara University thesis template (uuthesis.cls).
+% Changes from the original template main.tex are listed in README.md.
+% ===================================================================
+\documentclass[a4paper,12pt]{classes/uuthesis}
+
+% ---------- Page layout and fonts (as in the template) ----------
+\usepackage[T1]{fontenc}
+\usepackage{times}
+% Typewriter font for code: Inconsolata with straight quotes (Courier from
+% `times` renders ' as a curly quote, which misrepresents source code)
+\usepackage[varqu,scaled=0.92]{zi4}
+\usepackage[left=3cm,right=3cm,top=3cm,bottom=3cm]{geometry}
+
+% ---------- General packages ----------
+\usepackage[table]{xcolor}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{longtable}
+\usepackage{booktabs}
+\usepackage{setspace}
+\usepackage{parskip}
+\usepackage{ragged2e}
+\usepackage{tcolorbox}
+\usepackage{enumitem}
+\usepackage{xurl}
+\usepackage{tikz}
+\input{figures/diagram-style}   % shared colour palette, node styles and icons
+
+% ---------- Chapter heading style ----------
+% One numbering convention throughout: "Chapter 1" in headings, "CHAPTER 1:" in
+% the table of contents, and arabic section/figure/table numbers (1.1, 1.2, ...).
+\usepackage{titlesec}
+\titleformat{\chapter}[display]
+  {\normalfont\Large\bfseries\centering}
+  {\chaptertitlename\ \thechapter}{1em}{\Large}
+\titlespacing*{\chapter}{0pt}{10pt}{30pt}
+
+% ---------- Table of contents formatting ----------
+\usepackage{tocloft}
+\renewcommand{\cftchappresnum}{CHAPTER~}
+\renewcommand{\cftchapaftersnum}{:}
+\setlength{\cftchapnumwidth}{7.5em}
+\renewcommand{\cftchapleader}{\cftdotfill{\cftdotsep}}
+
+\numberwithin{figure}{chapter}
+\numberwithin{table}{chapter}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{2}
+
+% ---------- Captions, lists, tables ----------
+\captionsetup{font=small,labelfont=bf,justification=centering}
+% Lets TeX stretch inter-word space a little more before overflowing a line
+\setlength{\emergencystretch}{2.5em}
+% Float placement: let figures/tables share pages with text instead of
+% producing half-empty float pages (class defaults are very restrictive)
+\renewcommand{\topfraction}{0.85}
+\renewcommand{\bottomfraction}{0.5}
+\renewcommand{\textfraction}{0.1}
+\renewcommand{\floatpagefraction}{0.7}
+\setcounter{topnumber}{3}
+\setcounter{totalnumber}{4}
+\setlist{itemsep=2pt,topsep=4pt}
+\renewcommand{\arraystretch}{1.2}
+\newcolumntype{L}{>{\RaggedRight\arraybackslash}X}
+\newcolumntype{P}[1]{>{\RaggedRight\arraybackslash}p{#1}}
+
+% ---------- Project macros ----------
+\newcommand{\scpms}{SCPMS}
+% Inline code/paths in typewriter type; breakable (xurl) so long identifiers fit table cells
+\newcommand{\code}[1]{\nolinkurl{#1}}
+% Short shell commands or snippets that contain spaces (\code would drop them)
+\newcommand{\cmd}[1]{\texttt{\detokenize{#1}}}
+% Administrative information that could not be verified is printed in red so
+% that it can never be mistaken for completed content.
+\newcommand{\placeholder}[1]{\textcolor{red}{\textbf{[#1]}}}
+% Blank dotted line for details that are filled in by pen on the printed copy.
+\newcommand{\penline}[1][2.4in]{\makebox[#1]{\dotfill}}
+
+\newcommand{\reporttitle}{Design and Implementation of a Smart Courier and Parcel Management System}
+\newcommand{\studentA}{SHARMIN KHATUN}
+\newcommand{\studentAid}{2223081010}
+\newcommand{\studentB}{TASNIM JAHAN MIM}
+\newcommand{\studentBid}{2221081138}
+\newcommand{\supervisor}{Dr.\ Md.\ Obaidur Rahaman}
+\newcommand{\supervisordesig}{Professor, Department of CSE, Uttara University}
+\newcommand{\submissiondate}{27 October 2026}
+
+% ---------- Hyperlinks (loaded last) ----------
+\usepackage[hidelinks]{hyperref}
+\usepackage{bookmark}
+
+% Adds a starred front-matter chapter to the table of contents with the correct page
+\newcommand{\frontchapter}[1]{%
+  \cleardoublepage\phantomsection
+  \addcontentsline{toc}{chapter}{#1}%
+  \chapter*{\centering #1}}
+
+% ===================================================================
+\begin{document}
+\pagenumbering{roman}
+
+\input{frontmatters/title}
+
+\cleardoublepage\phantomsection
+\addcontentsline{toc}{chapter}{Title Page}
+\input{frontmatters/2ndpage}
+
+\frontchapter{Abstract}
+\input{frontmatters/abstract}
+
+\cleardoublepage\phantomsection
+\addcontentsline{toc}{chapter}{Clearance Page}
+\input{frontmatters/clearance}
+
+\cleardoublepage\phantomsection
+\addcontentsline{toc}{chapter}{Submission Page}
+\input{frontmatters/declaration}
+
+\cleardoublepage\phantomsection
+\addcontentsline{toc}{chapter}{Copyright}
+\input{frontmatters/copyright}
+
+\frontchapter{Dedication}
+\input{frontmatters/dedication}
+
+\frontchapter{Acknowledgment}
+\input{frontmatters/acknowledgment}
+
+\cleardoublepage\phantomsection
+\addcontentsline{toc}{chapter}{Table of Contents}
+\tableofcontents
+
+\cleardoublepage\phantomsection
+\addcontentsline{toc}{chapter}{List of Tables}
+\listoftables
+
+\cleardoublepage\phantomsection
+\addcontentsline{toc}{chapter}{List of Figures}
+\listoffigures
+
+\frontchapter{List of Abbreviations}
+\input{frontmatters/abbreviation}
+
+% ---------- Main matter ----------
+\cleardoublepage
+\pagenumbering{arabic}
+
+\chapter{Introduction}\label{chap:intro}
+\input{chapter1/introduction}
+
+\chapter{Literature Review}\label{chap:review}
+\input{chapter2/review}
+
+\chapter{Methodology}\label{chap:method}
+\input{chapter3/methodology}
+\input{chapter4/system}
+
+\chapter{Analysis, Results and Discussion}\label{chap:results}
+\input{chapter5/result}
+
+\chapter{Limitations}\label{chap:limits}
+\input{chapter5/limitations}
+
+\chapter{Conclusion}\label{chap:conclusion}
+\input{chapter6/conclusion}
+
+% ---------- References ----------
+\cleardoublepage\phantomsection
+\addcontentsline{toc}{chapter}{References}
+\renewcommand\bibname{References}
+\bibliographystyle{IEEEtran}
+\bibliography{backmatters/references}
+
+\end{document}

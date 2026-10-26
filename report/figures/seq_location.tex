@@ -1,0 +1,31 @@
+% Sequence: live agent location (derived from AgentDashboard.jsx, socket.js, updateLocation)
+\begin{tikzpicture}[font=\scriptsize, >=Stealth]
+\def\B{-10.9}
+\seqhead{0}{gps}{cAgent}{Agent phone\\(Geolocation API)}{\B}
+\seqhead{3.4}{g}{cAgent}{Agent UI}{\B}
+\seqhead{7.0}{srv}{cSock}{Socket.IO server\\+ Express API}{\B}
+\seqhead{10.4}{db}{cData}{MongoDB}{\B}
+\seqhead{13.6}{w}{cCust}{Watchers: admin,\\owner, public room}{\B}
+
+% ---------------- path A: socket broadcast
+\seqphase{-1.3}{14.8}{-0.85}{-5.85}{cSock}{A  SOCKET PATH}
+\pic at (0,-1.45) {phone=cAgent};
+\seqret[cAgent]{0.25}{3.4}{-2.0}{position (watchPosition)}
+\seqnote{3.55}{-2.15}{throttled; skipped if unchanged}
+\seqact{7.0}{-2.9}{-5.6}{cSock}
+\seqmsg[cAgent]{3.4}{6.91}{-3.05}{1}{agent:location:update}
+\seqnote{7.25}{-3.25}{dropped unless the socket belongs to an\\agent and agentId equals that agent;\\coordinate range check}
+\seqmsg[cData]{7.09}{10.4}{-4.8}{2}{active parcels\\of agent (cached 15 s)}
+\seqevt{7.09}{13.6}{-5.4}{emit to role:admin, parcel and owner rooms}
+
+% ---------------- path B: REST persistence
+\seqphase{-1.3}{14.8}{-5.95}{-10.6}{cCore}{B  REST PATH}
+\seqact{7.0}{-6.65}{-8.75}{cCore}
+\seqmsg[cAgent]{3.4}{6.91}{-6.8}{3}{POST /:id/location\\(In-Transit parcels)}
+\seqnote{7.25}{-7.0}{assigned agent only; parcel must be active}
+\seqmsg[cData]{7.09}{10.4}{-7.95}{4}{store currentLocation}
+\seqevt{7.09}{13.6}{-8.5}{emit parcel:location}
+\pic at (9.15,-9.65) {lock=cPub};
+\node[card=cPub, font=\tiny, align=left, anchor=west, text width=4.0cm] at (9.55,-9.6) {%
+  \textbf{Public viewers} are in \texttt{parcel:<id>} only after proving the tracking code with \texttt{subscribe:parcel}};
+\end{tikzpicture}
