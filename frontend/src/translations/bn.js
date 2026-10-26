@@ -86,7 +86,7 @@ export const bn = {
   somethingWentWrong: 'কিছু ভুল হয়েছে',
   
   // Placeholders
-  johnDoe: 'সাব্বির আহমেদ',
+  johnDoe: 'আপনার পুরো নাম',
   emailPlaceholder: 'আপনি@উদাহরণ.com',
   passwordPlaceholder: '••••••••',
   
