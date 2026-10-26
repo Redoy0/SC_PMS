@@ -126,6 +126,7 @@ Use `backend/env.example` as the reference for required variables. For productio
 - `MONGODB_URI`
 - `JWT_SECRET` (at least 32 random characters)
 - `MAIL_HOST`, `MAIL_USER`, `MAIL_PASS`, `MAIL_FROM` (required for sign-up email verification)
+  - On hosts that block outbound SMTP (Render's free plan), set `BREVO_API_KEY` and `MAIL_FROM` (a sender verified in Brevo) instead; email is then sent over HTTPS
 - `CLIENT_ORIGIN`, `APP_URL` (the deployed frontend URL)
 - `TRUST_PROXY_HOPS` (`2` when the frontend proxies `/api` to the backend)
 - `VITE_API_BASE` (`/api`; the frontend host proxies it to the backend)
