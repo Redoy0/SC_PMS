@@ -1,0 +1,94 @@
+\section{Overview}
+
+This chapter reviews the literature and technical sources that inform the design of \scpms. It begins with the operational context of last-mile courier logistics (Section~\ref{sec:lit-lastmile}) and the concept of visibility through tracking and tracing (Section~\ref{sec:lit-visibility}). It then examines comparable courier management systems (Section~\ref{sec:lit-systems}) and the technical foundations of the solution: real-time web communication (Section~\ref{sec:lit-realtime}), access control and web security (Section~\ref{sec:lit-security}), and maps, geolocation and machine-readable codes (Section~\ref{sec:lit-maps}). Section~\ref{sec:lit-compare} compares the approaches and derives the requirements carried into Chapter~\ref{chap:method}.
+
+Peer-reviewed literature is used to establish context and design principles. Official standards and documentation are used only to support specific technical facts about the technologies used, and the two kinds of source are kept distinct.
+
+\section{Last-Mile Delivery and Courier Operations}
+\label{sec:lit-lastmile}
+
+Boysen, Fedtke and Schwerdfeger survey last-mile delivery concepts from an operational-research perspective, ranging from conventional attended home delivery to parcel lockers, crowd-sourced delivery, drones and autonomous robots \cite{boysen2021lastmile}. They show that every concept raises its own planning and control problems, such as assignment, routing and scheduling, and that all of them rely on accurate information about orders, vehicles and customers. Ranieri et al.\ review last-mile innovations aimed at reducing external costs and group them into innovative vehicles, proximity stations, collaborative urban logistics, transport-management and routing optimisation, and public-policy measures. They also note that the last mile is the least efficient stage of the supply chain and can account for up to 28\% of total delivery cost \cite{ranieri2018review}. Olsson, Hellstr\"om and P\aa lsson propose a framework that organises last-mile research, highlighting the growing attention given to technology and information-sharing as enablers \cite{olsson2019framework}. Savelsbergh and Van Woensel discuss city logistics. They identify the growth of e-commerce, which has sharply increased direct-to-consumer deliveries, and the desire for speed, such as same-day delivery, as drivers of change in urban delivery, and note that information systems shared between the parties can improve its reliability and visibility \cite{savelsbergh2016city}.
+
+Two observations from this literature shape the present project. First, the last mile is information-intensive: dispatchers must know which parcels are pending and which agent is responsible for each. Second, the operational-research survey reviewed here treats the last mile mainly as a set of planning and optimisation problems (assignment, routing, scheduling) \cite{boysen2021lastmile}; the \emph{information system} that captures and distributes operational state lies outside its scope. For a small operator without an existing platform, that information system is the first need. \scpms{} addresses this layer and leaves optimisation as future work.
+
+\section{Visibility, Tracking and Tracing}
+\label{sec:lit-visibility}
+
+Musa, Gunasekaran and Yusuf define product visibility as the ability to know the identity, location and status of a product as it moves through the supply chain. They distinguish \emph{tracking} (following an item forward towards the customer) from \emph{tracing} (reconstructing its history) \cite{musa2014visibility}. Their review, based on academic and trade literature and an industry survey, finds that visibility systems depend on capturing identification and status events in a shared record, and that the benefits include better customer service and accountability. Both functions appear in \scpms: the current status and location of a parcel support tracking, and the recorded status history (status, time, actor, role) supports tracing.
+
+Delivery-confirmation research shows a related concern. Wibbeling and Schneiders describe an electronic proof-of-delivery project in which the handover at the point of delivery is captured electronically rather than on paper \cite{wibbeling2013epod}. The underlying idea is that a handover should be recorded at the moment and place it happens, by the party performing it. \scpms{} applies a lightweight form of this idea at \emph{pickup}: the agent scans a QR code shown by the customer, and the server accepts the resulting status change only from the agent assigned to that parcel. The QR code is an identification aid. It does not provide cryptographic proof of handover, a limitation discussed in Chapter~\ref{chap:limits}.
+
+\section{Existing Courier and Parcel Management Systems}
+\label{sec:lit-systems}
+
+Existing solutions fall into three broad categories.
+
+\textbf{Proprietary carrier platforms.} Large carriers and regional courier companies operate their own booking and tracking platforms, for example DHL's shipment-tracking service \cite{dhltracking} and, in Bangladesh, Pathao Courier's merchant booking with tracking by consignment number \cite{pathaocourier}. Their internal architectures, data models and access-control rules are not published, so they cannot be examined or reproduced academically, and they are not available to a small operator as a self-hosted system. This report therefore does not make comparative claims about the behaviour or performance of any named commercial platform.
+
+\textbf{Optimisation-oriented research systems.} Much of the academic literature reviewed above concentrates on planning models and algorithms \cite{boysen2021lastmile,savelsbergh2016city}. These works assume that order and position data are available and focus on how to use them, not on how a small organisation should capture and share them securely.
+
+\textbf{Web-based courier management applications.} A further category consists of web applications that implement booking, status updates and tracking for a single organisation, often as student or small-team projects. Parcel Pulse is a recent example: a three-tier application (HTML/CSS/JavaScript front end, PHP and MySQL) that separates customers, staff and administrators and supports booking and shipment tracking \cite{chaudhary2025parcelpulse}. Its published abstract reports no measured evaluation, and it does not state how status changes reach users or how sessions, ownership checks and public tracking pages are protected. Because such security and evaluation details are not available for the systems reviewed here, this thesis documents its own test evidence in detail.
+
+\section{Real-Time Web Communication}
+\label{sec:lit-realtime}
+
+The architectural style of most web APIs is Representational State Transfer (REST), in which clients manipulate resources through a uniform interface of stateless requests \cite{fielding2000rest}. REST suits operations such as booking or assigning a parcel. On its own, however, it gives the client no means of learning about changes it did not initiate: a client must poll repeatedly, which wastes bandwidth and delays updates by up to one polling interval.
+
+The WebSocket protocol, standardised in RFC~6455, establishes a persistent, full-duplex channel over a single TCP connection after an HTTP upgrade handshake \cite{rfc6455}. Pimentel and Nickerson studied WebSocket for communicating and displaying real-time sensor data in the browser and found it well suited to pushing frequent small updates to many clients, compared with HTTP polling approaches \cite{pimentel2012websocket}. Node.js complements this model: its single-threaded, event-driven, non-blocking I/O handles many concurrent, mostly idle connections efficiently \cite{tilkov2010node}. Socket.IO builds on WebSocket with automatic reconnection and \emph{rooms}, named groups of connections to which the server can address an event \cite{socketio}. Rooms are central to \scpms: they allow an event to be delivered only to the parties entitled to it (Section~\ref{sec:design-realtime}).
+
+\section{Access Control and Web Application Security}
+\label{sec:lit-security}
+
+\textbf{Role-based access control.} Sandhu et al.\ formalised role-based access control (RBAC), in which permissions are attached to roles and users acquire permissions through role membership \cite{sandhu1996rbac}. RBAC simplifies administration because policies are expressed per role rather than per user. Pure RBAC is not sufficient for a courier system, however: a customer may read \emph{their own} parcels but not those of other customers, and an agent may update only parcels \emph{assigned to them}. Role checks must therefore be combined with ownership checks on each object.
+
+\textbf{Common vulnerabilities.} The OWASP Top~10 (2021) ranks \emph{Broken Access Control} as the most serious web-application risk, followed by cryptographic failures and injection, and lists identification and authentication failures among the top ten \cite{owasptop10}. Insecure direct object references, where a user retrieves another user's record by changing an identifier, are a typical example of broken access control. For document databases, Ron, Shulman-Peleg and Puzanov show that NoSQL databases are also vulnerable to injection. A JSON request body containing query operators (for example \texttt{\{"\$ne": null\}}) can change the meaning of a query if user input is passed to the database unchecked \cite{ron2016nosql}.
+
+\textbf{Authentication and sessions.} JSON Web Tokens (JWT, RFC~7519) are a compact, signed format for transferring claims between parties \cite{rfc7519}. They let a stateless API verify a user's identity and role on each request, but they cannot be withdrawn before they expire unless the server keeps additional state. Long-lived tokens stored in JavaScript-accessible storage can be stolen through cross-site scripting. Cookies marked \code{HttpOnly} cannot be read by scripts \cite{rfc6265}, but cookie-authenticated endpoints then need protection against cross-site request forgery (CSRF) \cite{owaspcsrf}. The IETF's current best practice for OAuth~2.0 requires that refresh tokens issued to public clients be either sender-constrained or \emph{rotated}, with reuse of an old refresh token treated as a sign of theft \cite{rfc9700}. \scpms{} is not an OAuth system, but its session design adopts the same rotation-with-reuse-detection principle (Section~\ref{sec:impl-auth}).
+
+\textbf{Passwords.} Passwords should be stored with a deliberately slow, salted hash function. Bcrypt, introduced by Provos and Mazi\`eres, has an adjustable cost factor so that hashing can be made more expensive as hardware improves \cite{provos1999bcrypt}. NIST SP~800-63B requires memorised secrets of at least eight characters and rate limiting of failed authentication attempts. It recommends against imposing composition rules and recommends screening new passwords against lists of compromised values \cite{nist80063b}. Section~\ref{sec:design-security} compares the \scpms{} password policy with these recommendations.
+
+\section{Maps, Geolocation and Machine-Readable Codes}
+\label{sec:lit-maps}
+
+OpenStreetMap (OSM) is a collaboratively edited, openly licensed map of the world \cite{haklay2008osm}. Its data can be used without licence fees, which makes it attractive for small operators. Leaflet is a lightweight JavaScript library for interactive maps that can display OSM tiles \cite{leafletdocs}. The Open Source Routing Machine (OSRM) computes shortest road routes on OSM data quickly enough for interactive use \cite{luxen2011osrm}. Converting free-text addresses to coordinates (geocoding) can be done with OSM-based services. The public Nominatim service, however, has a strict usage policy, including a maximum of one request per second and a requirement to identify the application \cite{nominatimpolicy}. Public instances of such services are therefore unsuitable for high-volume production use without caching or a self-hosted instance.
+
+In the browser, the W3C Geolocation API provides the device's position, with user permission, either once or as a continuous watch \cite{w3cgeolocation}. QR codes (ISO/IEC~18004) encode short strings in a two-dimensional symbol that phone cameras can read reliably \cite{iso18004}. In browsers without a native barcode detector, the open-source ZXing library can decode them from a video stream \cite{zxingjs}. Together these allow an ordinary phone browser to act as a location reporter and a scanner, with no dedicated tracking hardware.
+
+\section{Comparison and Derived Requirements}
+\label{sec:lit-compare}
+
+Table~\ref{tab:lit-compare} compares the three categories of existing solution described in Section~\ref{sec:lit-systems} with the needs of a small courier operator identified in Chapter~\ref{chap:intro}. The comparison is qualitative and based on the cited sources. It is not a measured benchmark.
+
+\begin{table}[htbp]
+\centering
+\caption{Qualitative comparison of solution categories against the needs of a small courier operator}
+\label{tab:lit-compare}
+\small
+\begin{tabularx}{\textwidth}{@{}P{3.6cm}LLL@{}}
+\toprule
+\textbf{Need} & \textbf{Proprietary carrier platforms} & \textbf{Optimisation research} & \textbf{Published web CMS example \cite{chaudhary2025parcelpulse}} \\
+\midrule
+Self-hostable by a small operator & No & Not applicable (models) & Yes \\
+Shared parcel record with roles & Yes (internal, unpublished) & Assumed & Yes (three roles) \\
+Server-enforced lifecycle and audit trail & Unknown (not published) & Not addressed & Not described \\
+Push-based real-time updates & Unknown & Not addressed & Not described \\
+Privacy-preserving public tracking & Unknown & Not addressed & Not described \\
+Documented security and test evidence & Not available & Not applicable & Not reported \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The literature and the comparison lead to the following high-level requirements, which Chapter~\ref{chap:method} refines into functional and non-functional requirements:
+\begin{enumerate}[label=R\arabic*.]
+  \item One structured, shared record of each parcel, including a status history with actor and time \cite{musa2014visibility}.
+  \item Role-based access combined with object ownership checks, addressing broken access control \cite{sandhu1996rbac,owasptop10}.
+  \item Push-based propagation of changes to authorised clients only \cite{rfc6455,pimentel2012websocket}.
+  \item Sessions that resist token theft and can be revoked \cite{rfc6265,rfc9700}.
+  \item Input handling that prevents NoSQL injection \cite{ron2016nosql}.
+  \item Map display and location capture with open data and standard browser APIs, within the usage limits of public services \cite{haklay2008osm,w3cgeolocation,nominatimpolicy}.
+  \item Camera-based identification of parcels at handover, with commodity phones \cite{iso18004,wibbeling2013epod}.
+\end{enumerate}
+
+\section{Summary}
+
+The reviewed literature shows that last-mile delivery is costly and information-intensive, and that visibility depends on capturing status events in a shared record. The operational-research literature concentrates on planning and optimisation, while the information system that a small operator needs first lies outside its scope. The published web-based courier application reviewed here reports neither its security design nor a measured evaluation. The technical sources describe mature, openly available building blocks: WebSocket and rooms for push updates, RBAC with ownership checks, rotating refresh tokens, slow password hashing, OSM-based maps and QR codes. The next chapter turns these into requirements and a design for \scpms.

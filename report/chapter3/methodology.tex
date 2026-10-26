@@ -1,0 +1,344 @@
+\section{Overview}
+
+This chapter describes the method used to build \scpms: how the system was analysed and designed, and how the design was implemented. It presents the development methodology (Section~\ref{sec:devmethod}), the stakeholders and requirements (Sections~\ref{sec:stakeholders}--\ref{sec:nfr}), the use-case model (Section~\ref{sec:usecases}), and the system architecture, data model, lifecycle and interaction designs (Sections~\ref{sec:architecture}--\ref{sec:sequences}). It then covers the API and real-time design, the security design and the technology choices (Sections~\ref{sec:design-api}--\ref{sec:techselect}). It then describes the implementation: the development environment and project structure (Sections~\ref{sec:env}--\ref{sec:structure}), the backend modules (Sections~\ref{sec:impl-backend}--\ref{sec:impl-analytics}), the frontend (Section~\ref{sec:impl-frontend}), cross-cutting validation and hardening (Section~\ref{sec:impl-hardening}), deployment (Section~\ref{sec:impl-deploy}) and the main challenges (Section~\ref{sec:challenges}).
+
+All models in this chapter were derived from the implemented source code and checked against it. Where the design deviates from earlier project documents, the implemented design is described. File paths refer to the project repository. The behaviour of the code is described in prose, tables and diagrams; no source code is reproduced.
+
+All screenshots in this chapter were captured from the \emph{running application}, with the unmodified backend and the Vite development server, on a local machine. The database was a temporary in-memory MongoDB filled with demonstration data through the public API. The agent's position was a fixed, simulated browser location in Dhaka (23.8223\,N, 90.3654\,E). The capture script is included in the repository (\code{report/evidence/screenshots}). No screenshot is a mock-up.
+
+\section{Development Methodology}
+\label{sec:devmethod}
+
+The project used an iterative and incremental process \cite{larman2003iterative,pressman2020se}. Each increment produced working software that was exercised before the next was started, which suited a two-person team with a fixed defense date. The increments, reconstructed from the progress report (22~July~2026), the security review records and the code, were:
+
+\begin{enumerate}
+  \item \textbf{Planning and analysis} (late April to May 2026): problem definition, literature review, and identification of roles and lifecycle states.
+  \item \textbf{Design} (May 2026): data model, interface wireframes for the three roles, and the choice of the MERN stack with Socket.IO.
+  \item \textbf{Core implementation} (May to July 2026): authentication, parcel booking, assignment, lifecycle, real-time tracking and QR-assisted pickup.
+  \item \textbf{Extension} (July to October 2026): e-mail notifications, analytics and export, the Bangla interface, the landing page and deployment configuration.
+  \item \textbf{Security hardening} (two rounds, July and October 2026): fixes for access-control, session and injection weaknesses found in code review (Section~\ref{sec:design-security}).
+  \item \textbf{Evaluation and documentation} (October 2026): the test harness, static analysis and this report.
+\end{enumerate}
+
+The phases above are reconstructed from the dated project documents.
+
+\section{Stakeholder and User Analysis}
+\label{sec:stakeholders}
+
+Table~\ref{tab:roles} summarises the user roles, their goals and the access the system grants them.
+
+\begin{table}[htbp]
+\centering
+\caption{User roles, goals and granted capabilities}
+\label{tab:roles}
+\small
+\begin{tabularx}{\textwidth}{@{}P{2.4cm}LL@{}}
+\toprule
+\textbf{Role} & \textbf{Goals} & \textbf{Capabilities in \scpms} \\
+\midrule
+Customer & Send parcels and know their status without phoning the operator & Self-register (e-mail verified); book parcels; list and view \emph{own} parcels; show a parcel QR code; follow a parcel on a map; receive status e-mails \\
+Delivery agent & Know assigned work; record progress quickly in the field & Account created by an administrator (invitation); list \emph{assigned} parcels; scan the QR code at pickup; move parcels forward or mark them failed; share live location \\
+Administrator & Coordinate agents; keep accurate records; monitor operations & List all users and parcels; add, disable and re-enable accounts; assign and reassign agents; correct non-final statuses; delete parcels; view metrics; export CSV and PDF; track agents on a map \\
+Public viewer & Check a parcel's status without an account & View a reduced parcel record (no customer identity, contact details or notes) and live updates for a known tracking code \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Functional Requirements}
+\label{sec:fr}
+
+Table~\ref{tab:fr} lists the functional requirements. They were consolidated from the project proposal, the progress report and the implemented behaviour. Requirements that appeared in early documents but were not implemented (for example SMS notifications, revenue reports or a manager role) are deliberately excluded.
+
+\begin{longtable}{@{}P{1.3cm}P{9.2cm}P{3.2cm}@{}}
+\caption{Functional requirements}\label{tab:fr}\\
+\toprule
+\textbf{ID} & \textbf{Requirement} & \textbf{Actor(s)} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Requirement} & \textbf{Actor(s)} \\
+\midrule
+\endhead
+FR-01 & The system shall let a visitor register as a customer with name, e-mail, Bangladeshi mobile number and a password satisfying the password policy, after accepting the terms. Any role supplied by the client shall be ignored. & Customer \\
+FR-02 & The system shall authenticate users by e-mail and password, refuse sign-in to unverified or disabled accounts, and lock an account for 15~minutes after five consecutive failed attempts. & All \\
+FR-03 & The system shall maintain sessions with a short-lived access token and a rotating refresh token, and support sign-out. & All \\
+FR-04 & The system shall restrict every operation according to the user's role and, where relevant, ownership of or assignment to the parcel. & All \\
+FR-05 & Administrators shall create delivery-agent accounts, which are activated by an invitation link, and shall disable or re-enable any account other than their own. & Administrator \\
+FR-06 & Customers shall book a parcel by entering pickup and delivery addresses, size, type, payment type, COD amount (0--500{,}000) and optional notes. Invalid input shall be rejected. & Customer \\
+FR-07 & The system shall assign each parcel a unique, hard-to-guess tracking code. & System \\
+FR-08 & The parcel list shall show customers their own parcels, agents their assigned parcels and administrators all parcels (optionally filtered by agent). & All roles \\
+FR-09 & Anyone holding a tracking code shall be able to view the parcel's status, addresses, current location, agent name and status timeline, without personal data of the customer. & Public viewer \\
+FR-10 & Administrators shall assign an active, activated agent to a parcel and may reassign it while it is Pending or Assigned. & Administrator \\
+FR-11 & Parcel status shall follow the lifecycle rules of Figure~\ref{fig:statemachine}: agents move assigned parcels forward or mark them Failed, administrators may correct non-final parcels, and final states are locked. & Agent, Administrator \\
+FR-12 & Assigned agents shall share their location. The system shall store the parcel's current location and push location and status changes to authorised watchers in real time. & Agent, System \\
+FR-13 & The system shall record every status change with the new status, time, acting user and role. & System \\
+FR-14 & Administrators shall see the number of bookings today, the number of failed deliveries and the total COD collected from delivered parcels. & Administrator \\
+FR-15 & Administrators shall export the parcel list as CSV and PDF. & Administrator \\
+FR-16 & Administrators shall delete parcels. & Administrator \\
+FR-17 & Users shall reset a forgotten password through a single-use, time-limited e-mail link. & All \\
+FR-18 & Customers shall display a QR code for each parcel, and agents shall scan it (or enter it manually) to open the pickup confirmation for that parcel. & Customer, Agent \\
+FR-19 & The system shall e-mail the customer when a parcel's status changes. & System \\
+FR-20 & The interface shall be available in English and Bangla. & All \\
+FR-21 & Parcel pages shall show pickup and delivery points and a road route on a map, together with the agent's live position when available. & All \\
+\bottomrule
+\end{longtable}
+
+\section{Non-Functional Requirements}
+\label{sec:nfr}
+
+The non-functional requirements (Table~\ref{tab:nfr}) follow the quality characteristics of ISO/IEC~25010 \cite{iso25010}. Each is stated with the way it was verified, in the spirit of ISO/\allowbreak IEC/\allowbreak IEEE~29148, which asks that requirements be verifiable \cite{iso29148}.
+
+\begin{table}[htbp]
+\centering
+\caption{Non-functional requirements and verification methods}
+\label{tab:nfr}
+\small
+\begin{tabularx}{\textwidth}{@{}P{2.2cm}LP{3.6cm}@{}}
+\toprule
+\textbf{Quality} & \textbf{Requirement} & \textbf{Verification} \\
+\midrule
+Security & Passwords hashed with bcrypt; credentials never returned; access tokens short-lived; refresh tokens stored only as hashes; brute-force and enumeration resisted; NoSQL operators stripped from input; security headers set & Tests T02, T11--T22, T62--T63, T65--T66; code review \\
+Privacy & Public tracking and public sockets expose no customer identity, contact details, notes or other customers' data & Tests T34, T43, T51 \\
+Responsiveness & Status and location changes reach connected, authorised clients without page refresh & Tests T43, T49, T51; latency sampling (Section~\ref{sec:perf}) \\
+Robustness & Malformed JSON, invalid identifiers and unknown routes produce 4xx responses, not crashes or stack traces & Tests T03, T04, T33 \\
+Usability & Responsive layout; English and Bangla; manual fallback when the camera is unavailable & Screenshots; manual inspection (no user study performed) \\
+Maintainability & Layered backend (routes, controllers, models, services, utilities); shared constants for enums & Code inspection; lint results \\
+Deployability & Configuration through environment variables; production refuses to start without a strong JWT secret and an origin allow-list; health endpoint & Code inspection; test T01 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Use Cases}
+\label{sec:usecases}
+
+Figure~\ref{fig:usecase} shows the use-case model. Table~\ref{tab:uc} describes the four use cases that carry the main workflow.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.92\textwidth}{!}{\input{figures/usecase}}
+\caption{Use-case diagram of \scpms}
+\label{fig:usecase}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption{Descriptions of the principal use cases}
+\label{tab:uc}
+\small
+\begin{tabularx}{\textwidth}{@{}P{2.4cm}L@{}}
+\toprule
+\textbf{Use case} & \textbf{Description} \\
+\midrule
+UC1 Book parcel & \emph{Actor:} customer (signed in, verified). \emph{Flow:} enters addresses, size, type, payment and COD amount; system validates, generates a tracking code, stores the parcel as Pending and notifies administrators in real time. \emph{Result:} parcel listed with its tracking code and QR code. \emph{Alternative:} invalid input returns an error message and nothing is stored. \\
+UC2 Assign agent & \emph{Actor:} administrator. \emph{Flow:} selects an active agent for a Pending or Assigned parcel; system stores the assignment, appends Assigned to the history and pushes the update to the customer, agent and watchers. \emph{Alternative:} agent inactive or invitation pending, or parcel already picked up: request refused. \\
+UC3 Confirm pickup & \emph{Actor:} assigned agent. \emph{Flow:} scans the customer's QR code (or pastes the link or id); confirmation page shows parcel details; agent confirms; system sets Picked Up if the caller is the assigned agent. \emph{Alternative:} parcel not assigned to the caller: 403 and explanatory message. \\
+UC4 Track parcel & \emph{Actor:} customer or public viewer. \emph{Flow:} opens the parcel page or enters a tracking code; system returns the parcel (reduced view for public) and subscribes the browser to the parcel's real-time room; map shows route and agent position as updates arrive. \emph{Alternative:} unknown code: ``not found''. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{System Architecture}
+\label{sec:architecture}
+
+\textbf{Context.} Figure~\ref{fig:context} places \scpms{} in its environment. Four kinds of user interact with it. It depends on MongoDB for persistence, an SMTP server for e-mail and OSM-based services for geocoding, map tiles and routing.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.95\textwidth}{!}{\input{figures/context}}
+\caption{System context diagram}
+\label{fig:context}
+\end{figure}
+
+\textbf{Layers.} \scpms{} is a client--server single-page application (Figure~\ref{fig:architecture}). The React client is delivered as static files and talks to the backend in two ways. Ordinary operations use REST over HTTPS on the same origin (\code{/api}), proxied to the backend so that the refresh cookie is treated as first-party. Real-time events use a Socket.IO connection opened directly to the backend. The backend is a single Node.js process with an Express application and a Socket.IO server sharing one HTTP server. Inside it, requests pass through a fixed middleware chain, then route modules that bind URLs to role guards, then controllers that validate input and apply business rules, and finally Mongoose models. Cross-cutting concerns live in services (sessions, socket handling, room-scoped emission) and utilities (JWT, random tokens, validation, mail).
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/architecture}}
+\caption{Layered architecture of \scpms}
+\label{fig:architecture}
+\end{figure}
+
+\textbf{Rationale.} A layered, MVC-inspired backend keeps HTTP concerns, business rules and persistence separate, so that rules such as the lifecycle transition check exist in one place (the controller) and are applied to every client. Running REST and Socket.IO in one process lets controllers emit real-time events directly after a successful database write, without a message broker. The cost is that horizontal scaling would require a shared adapter for Socket.IO rooms, a limitation discussed in Chapter~\ref{chap:limits}.
+
+\section{Database Design}
+\label{sec:dbdesign}
+
+\scpms{} stores its data in three MongoDB collections defined with Mongoose schemas (Figure~\ref{fig:er}).
+
+\begin{figure}[htbp]
+\centering
+\resizebox{0.95\textwidth}{!}{\input{figures/er}}
+\caption[Entity--relationship diagram of the three collections]{Entity--relationship diagram of the three collections (derived from \code{backend/src/models})}
+\label{fig:er}
+\end{figure}
+
+\begin{itemize}
+  \item \textbf{User} holds identity and credentials for all roles. Secret fields (password hash, verification-code hash, reset-token hash, lockout counters) are marked \cmd{select: false}, so they are never loaded unless a query asks for them explicitly. The \code{tokenVersion} counter supports immediate revocation of access tokens. \code{createdBy} records which administrator created an agent.
+  \item \textbf{Parcel} references its customer and (optionally) its agent. It embeds its \code{statusHistory} and \code{currentLocation}, because both are always read together with the parcel and are bounded in size. Enumerated fields (\code{status}, \code{parcelSize}, \code{parcelType}, \code{paymentType}) are validated by the schema, and the same constants are reused by the controllers. Indexes exist on \code{trackingCode} (unique), \code{customer}, \code{agent} and \code{status}, matching the main query patterns.
+  \item \textbf{Session} stores one document per refresh token: only its SHA-256 hash, the rotation \code{family}, expiry and revocation timestamps, and client metadata. A TTL index on \code{expiresAt} makes MongoDB delete expired sessions automatically \cite{mongodbdocs}.
+\end{itemize}
+
+Embedding the status history rather than using a separate events collection keeps the lifecycle update atomic (a single document write). This differs from earlier draft documents, which proposed separate tracking-event, notification, activity-log and report collections. Those collections were never implemented.
+
+\section{Parcel Lifecycle Model}
+\label{sec:lifecycle-design}
+
+The lifecycle is the core business rule of the system. Figure~\ref{fig:statemachine} shows the six states and the transitions permitted by the server.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/statemachine}}
+\caption{Parcel lifecycle state machine as enforced by the backend}
+\label{fig:statemachine}
+\end{figure}
+
+Three design decisions deserve comment. First, \emph{responsibility is explicit}: only the assigned agent may change a parcel's status as an agent, and active states require an assigned agent. Second, \emph{final states are immutable}: once Delivered or Failed, a parcel cannot change, even by an administrator, which protects the reliability of records and analytics. Third, the rules for agents are \emph{forward-only rather than strictly sequential}. An agent may skip intermediate states (for example from Assigned directly to Delivered). This keeps field use flexible but means that the history does not guarantee that every intermediate state was recorded. Test T56 documents this behaviour, and Chapter~\ref{chap:conclusion} recommends whether it should be tightened.
+
+\section{Interaction Design}
+\label{sec:sequences}
+
+Figure~\ref{fig:seq-booking} traces the main workflow from booking to pickup across the three user interfaces, the API, the database and the Socket.IO rooms. Every state change follows the same pattern: authorise, validate, write to the database, then emit a scoped event and, where relevant, send an e-mail asynchronously.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/seq_booking}}
+\caption{Sequence diagram: booking, assignment and QR-assisted pickup}
+\label{fig:seq-booking}
+\end{figure}
+
+Figure~\ref{fig:seq-location} shows the two paths by which location reaches watchers. The \emph{socket path} is used for continuous agent tracking. The server verifies the sender and fans the position out to administrators and to watchers of that agent's active parcels. The \emph{REST path} stores the position on In-Transit parcels so that it survives page reloads and is visible to public viewers.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/seq_location}}
+\caption{Sequence diagram: live agent location}
+\label{fig:seq-location}
+\end{figure}
+
+\section{API and Real-Time Design}
+\label{sec:design-api}
+
+\textbf{REST API.} The backend exposes 25 REST endpoints under \code{/api} plus a health check. Table~\ref{tab:api-summary} groups them.
+
+\begin{table}[htbp]
+\centering
+\caption{REST API groups}
+\label{tab:api-summary}
+\small
+\begin{tabularx}{\textwidth}{@{}P{3.2cm}P{1.0cm}L@{}}
+\toprule
+\textbf{Base path} & \textbf{No.} & \textbf{Purpose and access} \\
+\midrule
+\code{/api/auth} & 8 & Register, verify e-mail, resend code, login, refresh, logout, forgot and reset password. Public, individually rate-limited; refresh and logout require the custom CSRF header \\
+\code{/api/parcels} & 8 & Public tracking by code (rate-limited); authenticated list, create (customer), read (owner, assigned agent or admin), assign (admin), status (admin or agent), location (agent) and delete (admin) \\
+\code{/api/users} & 5 & Own profile; list users, create agent, resend invitation, enable or disable (admin) \\
+\code{/api/assignments} & 1 & Active, activated agents available for assignment (admin) \\
+\code{/api/analytics} & 3 & Dashboard metrics, CSV export, PDF export (admin) \\
+\code{/api/geocode} & 1 & Rate-limited proxy to Photon with Nominatim fallback, biased to Bangladesh \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Real-time events.} Table~\ref{tab:socket-events} lists the Socket.IO events.
+
+\begin{table}[htbp]
+\centering
+\caption{Socket.IO events}
+\label{tab:socket-events}
+\small
+\begin{tabularx}{\textwidth}{@{}P{4.0cm}P{2.2cm}L@{}}
+\toprule
+\textbf{Event} & \textbf{Direction} & \textbf{Meaning and scope} \\
+\midrule
+\code{subscribe:parcel} / \code{unsubscribe:parcel} & client $\rightarrow$ server & Join or leave \code{parcel:<id>}. Joining requires ownership, assignment, admin role, or the correct tracking code (at most 25 parcel rooms per socket) \\
+\code{agent:location:update} & both & Agent publishes own position. Server forwards to \code{role:admin} and to watchers of the agent's active parcels \\
+\code{request:agent:location} & both & Admin asks for an agent's position. Server replies with the last known position and forwards the request to that agent only \\
+\code{parcel:created} & server $\rightarrow$ client & New booking, sent to administrators \\
+\code{parcel:update} & server $\rightarrow$ client & Status or assignment change, sent to parcel watchers \\
+\code{parcel:location} & server $\rightarrow$ client & Stored location change, sent to parcel watchers \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\label{sec:design-realtime}
+\textbf{Room scoping.} Figure~\ref{fig:rooms} shows how events are scoped. Every authenticated socket joins \code{user:<id>}, and administrators also join \code{role:admin}. Parcel rooms are joined on request after an authorisation check. Anonymous sockets can join a parcel room only by presenting the parcel's tracking code, which mirrors the public REST endpoint. No event is broadcast to all sockets. An earlier version of the system broadcast agent locations globally. This design replaced it during the security hardening.
+
+\begin{figure}[htbp]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/rooms}}
+\caption{Scoping of real-time events through Socket.IO rooms}
+\label{fig:rooms}
+\end{figure}
+
+\section{Security and Access-Control Design}
+\label{sec:design-security}
+
+The security design was refined in two review rounds recorded in the project's security review. Each finding was fixed in the code, and the fixes are present in the current source. Table~\ref{tab:threats} maps the main threats to controls and to the OWASP Top~10 categories \cite{owasptop10}.
+
+\begin{table}[htbp]
+\centering
+\caption{Threats, controls and OWASP Top 10 (2021) categories}
+\label{tab:threats}
+\small
+\begin{tabularx}{\textwidth}{@{}P{3.4cm}LP{1.8cm}@{}}
+\toprule
+\textbf{Threat} & \textbf{Control in \scpms} & \textbf{OWASP} \\
+\midrule
+Privilege escalation at sign-up & Role forced to \code{customer}; agents only created by admins & A01 \\
+Reading or changing others' parcels (IDOR) & Ownership/assignment checks in controllers; role guards on routes & A01 \\
+Token theft via script injection & Access token kept only in memory (15~min); refresh token in \code{HttpOnly}, \code{SameSite=Lax} cookie, path \code{/api/auth} & A07 \\
+Stolen refresh token & Rotation on every use; reuse after 30~s grace revokes the token family & A07 \\
+Revocation after password reset or disabling & \code{tokenVersion} embedded in tokens and checked on every request and socket connection & A07 \\
+CSRF on cookie endpoints & \code{SameSite=Lax} plus mandatory \code{X-Requested-With} header \cite{owaspcsrf} & A01 \\
+Password guessing & bcrypt (cost 12) \cite{provos1999bcrypt}; lockout after 5 failures; per-endpoint rate limits & A07 \\
+Account enumeration & Identical responses for unknown e-mails; dummy bcrypt comparison for timing & A07 \\
+NoSQL injection & Keys starting with \code{$} or containing \code{.} removed from body, query and params; type checks on ids \cite{ron2016nosql} & A03 \\
+Location spoofing & Socket accepts an agent's position only from that authenticated agent & A01 \\
+Data leakage on public pages & Reduced public view; room-scoped events & A01 \\
+Misconfiguration & Production refuses to start without a JWT secret of at least 32 characters or an origin allow-list; \code{helmet} headers \cite{helmetdocs}; generic error responses & A05 \\
+Vulnerable dependencies & Audit fixes applied; production dependency audit clean (Section~\ref{sec:static}) & A06 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+The password policy requires 8--64 characters including at least one letter and one digit. It meets the NIST minimum length, and the lockout and rate limits satisfy the NIST rate-limiting requirement. However, the composition rule is something NIST recommends against, and new passwords are not screened against breached-password lists \cite{nist80063b}. These two deviations are recorded as limitations.
+
+\section{Technology Selection and Justification}
+\label{sec:techselect}
+
+Table~\ref{tab:tech} summarises the main technologies and the reason for each choice.
+
+\begin{table}[htbp]
+\centering
+\caption{Technology choices and justification}
+\label{tab:tech}
+\small
+\begin{tabularx}{\textwidth}{@{}P{3.2cm}L@{}}
+\toprule
+\textbf{Technology} & \textbf{Justification} \\
+\midrule
+Node.js + Express 4 & One language (JavaScript) across client and server; event-driven I/O suits many concurrent socket connections \cite{tilkov2010node}; minimal framework with mature middleware \cite{expressdocs} \\
+MongoDB + Mongoose 8 & Document model fits a parcel with embedded history and location; schema validation and enums in Mongoose \cite{mongoosedocs}; TTL indexes expire sessions \cite{mongodbdocs} \\
+React 19 + Vite 7 & Component model for three role-specific interfaces; fast development server with an API proxy \cite{reactdocs,vitedocs} \\
+Socket.IO 4 & WebSocket transport with reconnection and rooms, which implement the access-scoped event design \cite{socketio,rfc6455} \\
+Leaflet + OpenStreetMap + OSRM & No licence fees; open data with local (Bangla) labels; road routing \cite{leafletdocs,haklay2008osm,luxen2011osrm} \\
+Photon / Nominatim (via backend proxy) & Free OSM-based geocoding. The proxy adds rate limiting and Bangladesh bias, and identifies the application as required by the Nominatim policy \cite{nominatimpolicy} \\
+qrcode + ZXing / BarcodeDetector & QR generation and scanning in the browser, with no native app or special hardware \cite{iso18004,zxingjs} \\
+jsonwebtoken, bcryptjs, helmet, express-rate-limit & Standard, well-documented building blocks for tokens \cite{rfc7519}, password hashing \cite{provos1999bcrypt}, headers \cite{helmetdocs} and throttling \\
+Nodemailer + PDFKit & SMTP e-mail \cite{nodemailerdocs} and server-side PDF generation without external services \\
+Tailwind CSS 3 & Utility classes for a consistent responsive layout \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Design Constraints and Assumptions}
+\label{sec:constraints}
+
+\begin{itemize}
+  \item \textbf{Single operator, single process.} The design assumes one courier organisation and one backend instance. Last-known agent positions are held in memory.
+  \item \textbf{Browser-based devices.} Agents use a phone browser that supports geolocation and camera access over HTTPS. Location accuracy is that of the device.
+  \item \textbf{Free third-party services.} Map tiles, routing and geocoding use public services with usage limits and no availability guarantee.
+  \item \textbf{E-mail as the only notification channel.} Without SMTP configured in production, sign-up is disabled, because verification is mandatory.
+  \item \textbf{Addresses as free text.} Addresses are geocoded on display rather than stored as coordinates, so ambiguous addresses may be placed inaccurately on the map.
+  \item \textbf{Bangladeshi context.} Telephone validation accepts only Bangladeshi mobile numbers, and currency amounts are in Bangladeshi taka.
+\end{itemize}

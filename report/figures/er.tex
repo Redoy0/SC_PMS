@@ -1,0 +1,71 @@
+% Entity-relationship diagram (derived from backend/src/models/*.js)
+\begin{tikzpicture}[font=\scriptsize, >=Stealth,
+  ent/.style={hcard=#1, text width=5.7cm},
+  pk/.style={}, rel/.style={line width=1.1pt, draw=#1}]
+\newcommand{\PK}{\textcolor{cPub}{\textbf{PK}}\ }
+\newcommand{\FK}{\textcolor{cSock}{\textbf{FK}}\ }
+\newcommand{\UQ}{\textcolor{cAdmin}{\textbf{UQ}}\ }
+\newcommand{\hid}{\textcolor{cRed}{\textit{hidden}}}
+
+\node[ent=cCust] (user) at (0,0) {%
+  \textcolor{white}{\normalsize\bfseries User}\hfill\textcolor{white}{\tiny all roles}\nodepart{second}
+  \PK\texttt{\_id} : ObjectId\\
+  \hspace*{3.6mm}\texttt{name} : String (2--80)\\
+  \UQ\texttt{email} : String, lower-case\\
+  \hspace*{3.6mm}\texttt{phone} : 01XXXXXXXXX\\
+  \hspace*{3.6mm}\texttt{password} : bcrypt hash \hid\\
+  \hspace*{3.6mm}\texttt{role} : admin $|$ agent $|$ customer\\
+  \hspace*{3.6mm}\texttt{isActive}, \texttt{emailVerified} : Boolean\\
+  \hspace*{3.6mm}\texttt{emailVerification} \{codeHash, expiresAt,\\
+  \hspace*{7mm}attempts, lastSentAt\} \hid\\
+  \hspace*{3.6mm}\texttt{passwordReset} \{tokenHash, expiry\} \hid\\
+  \hspace*{3.6mm}\texttt{tokenVersion} : Number\\
+  \hspace*{3.6mm}\texttt{failedLoginAttempts}, \texttt{lockUntil} \hid\\
+  \FK\texttt{createdBy} $\rightarrow$ User\\
+  \hspace*{3.6mm}\texttt{lastLoginAt}, timestamps};
+
+\node[ent=cCore, anchor=north west] (parcel) at ($(user.north east)+(3.4,0)$) {%
+  \textcolor{white}{\normalsize\bfseries Parcel}\hfill\textcolor{white}{\tiny core record}\nodepart{second}
+  \PK\texttt{\_id} : ObjectId\\
+  \UQ\texttt{trackingCode} : 10 chars, indexed\\
+  \FK\texttt{customer} $\rightarrow$ User (indexed)\\
+  \FK\texttt{agent} $\rightarrow$ User, optional (indexed)\\
+  \hspace*{3.6mm}\texttt{pickupAddress}, \texttt{deliveryAddress}\\
+  \hspace*{3.6mm}\texttt{parcelSize} : Small $|$ Medium $|$ Large\\
+  \hspace*{3.6mm}\texttt{parcelType} : Document $|$ Fragile $|$\\
+  \hspace*{7mm}Standard $|$ Perishable\\
+  \hspace*{3.6mm}\texttt{paymentType} : COD $|$ Prepaid\\
+  \hspace*{3.6mm}\texttt{codAmount} : 0 -- 500{,}000\\
+  \hspace*{3.6mm}\texttt{status} : 6 lifecycle states (indexed)\\
+  \hspace*{3.6mm}\texttt{statusHistory}[\,] \{status, at, by, role\}\\
+  \hspace*{3.6mm}\texttt{currentLocation} \{lat, lng, updatedAt\}\\
+  \hspace*{3.6mm}\texttt{etaMinutes}, \texttt{notes}, timestamps};
+
+\node[ent=cData, anchor=north] (session) at ($(user.south)+(0,-1.5)$) {%
+  \textcolor{white}{\normalsize\bfseries Session}\hfill\textcolor{white}{\tiny refresh tokens}\nodepart{second}
+  \PK\texttt{\_id} : ObjectId\\
+  \FK\texttt{user} $\rightarrow$ User (indexed)\\
+  \UQ\texttt{tokenHash} : SHA-256\\
+  \hspace*{3.6mm}\texttt{family} : rotation chain id\\
+  \hspace*{3.6mm}\texttt{expiresAt} : Date (\textbf{TTL index})\\
+  \hspace*{3.6mm}\texttt{revokedAt}, \texttt{rotatedAt} : Date\\
+  \hspace*{3.6mm}\texttt{persistent}, \texttt{userAgent}, \texttt{ip}};
+
+% relationships
+\coordinate (b1) at ($(user.east)+(0,1.6)$);
+\coordinate (b2) at ($(user.east)+(0,-0.2)$);
+\draw[rel=cCust] (b1) -- node[elabel, above=2pt]{\textbf{books}} (b1 -| parcel.west);
+\node[tag=cCust] at ($(b1)+(0.35,-0.28)$) {1};
+\node[tag=cCust] at ($(b1 -| parcel.west)+(-0.45,-0.28)$) {0..*};
+\draw[rel=cAgent] (b2) -- node[elabel, above=2pt]{\textbf{is assigned}} (b2 -| parcel.west);
+\node[tag=cAgent] at ($(b2)+(0.45,-0.28)$) {0..1};
+\node[tag=cAgent] at ($(b2 -| parcel.west)+(-0.45,-0.28)$) {0..*};
+\draw[rel=cData] (user.south) -- node[elabel, right=3pt]{\textbf{has sessions}} (session.north);
+\node[tag=cData] at ($(user.south)+(-0.3,-0.3)$) {1};
+\node[tag=cData] at ($(session.north)+(-0.4,0.3)$) {0..*};
+
+% legend
+\node[anchor=north west, font=\tiny, text=cInk, align=left] at ($(parcel.south west)+(0,-0.35)$) {%
+  \PK primary key \quad \FK reference \quad \UQ unique\\
+  \hid: \texttt{select:false}, never returned by default};
+\end{tikzpicture}
