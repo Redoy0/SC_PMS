@@ -1,0 +1,36 @@
+% Sequence: sign-in, silent refresh with rotation and reuse detection
+% (derived from auth.controller.js, session.service.js, frontend/src/api.js)
+\begin{tikzpicture}[font=\scriptsize, >=Stealth]
+\def\B{-12.2}
+\seqhead{0}{b}{cCust}{Browser (React)}{\B}
+\seqhead{6.0}{api}{cCore}{Express API}{\B}
+\seqhead{11.0}{db}{cData}{Session collection}{\B}
+
+% ---------------- sign in
+\seqphase{-3.0}{12.2}{-0.75}{-3.85}{cCust}{1  SIGN IN}
+\seqact{6.0}{-1.2}{-3.55}{cCore}
+\seqmsg[cCust]{0}{5.91}{-1.35}{1}{POST /auth/login \{email, password, remember\}}
+\seqnote{6.25}{-1.55}{lock check $\rightarrow$ bcrypt compare\\$\rightarrow$ active and verified}
+\seqmsg[cData]{6.09}{11.0}{-2.65}{2}{store SHA-256(token), new family}
+\seqret{5.91}{0}{-3.4}{access JWT (15 min, in memory)\\+ HttpOnly refresh cookie}
+
+% ---------------- refresh
+\seqphase{-3.0}{12.2}{-4.05}{-7.5}{cCore}{2  REFRESH}
+\seqmsg[cCust]{0}{5.91}{-4.6}{3}{API requests with Authorization: Bearer}
+\seqnote{0.3}{-4.95}{token near expiry, or 401 TOKEN\_EXPIRED}
+\seqact{6.0}{-5.95}{-7.3}{cCore}
+\seqmsg[cCust]{0}{5.91}{-6.1}{4}{POST /auth/refresh\\(cookie + X-Requested-With)}
+\seqmsg[cData]{6.09}{11.0}{-6.6}{5}{mark old token rotated; store new hash}
+\seqret{5.91}{0}{-7.15}{new access JWT + rotated cookie}
+
+% ---------------- reuse detection
+\seqphase{-3.0}{12.2}{-7.65}{-11.9}{cRed}{3  REUSE}
+\pic at (-2.0,-8.05) {person=cRed};
+\draw[cRed!60, line width=0.7pt, dash pattern=on 3pt off 2pt] (-2.0,-8.75) -- (-2.0,\B+0.3);
+\seqact{6.0}{-8.25}{-11.45}{cRed}
+\seqmsg[cRed]{-2.0}{5.91}{-8.4}{6}{attacker replays the old (already rotated) cookie}
+\seqnote{6.25}{-8.6}{rotated more than 30 s ago\\$\Rightarrow$ reuse detected}
+\seqmsg[cRed]{6.09}{11.0}{-9.65}{7}{revoke the whole token family}
+\seqret[cRed]{5.91}{-2.0}{-10.3}{401 TOKEN\_REUSE}
+\seqret[cRed]{5.91}{0}{-11.15}{legitimate session also ends: sign in again}
+\end{tikzpicture}

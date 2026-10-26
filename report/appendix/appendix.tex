@@ -1,0 +1,130 @@
+% Appendices. The class's \appendix switches chapter numbering to letters
+% ("Appendix A"); main.tex switches the table-of-contents prefix accordingly.
+
+\chapter{Executed Test Cases}
+\label{app:tests}
+
+This appendix lists every test case executed by \code{report/evidence/api-test/run-api-tests.cjs} on 19~October~2026, with the requirement it addresses, the expected behaviour and the observed result. The table was generated from \code{results.json} by \code{make-tables.cjs}. Long tokens were redacted from the accompanying server log.
+
+\input{tables/test-cases}
+
+\chapter{REST API Reference}
+\label{app:api}
+
+All paths are relative to the backend origin. ``Auth'' means a valid bearer access token is required. Rate limits are per client address and window of 15 minutes unless stated.
+
+\begin{small}
+\begin{longtable}{@{}P{1.4cm}P{4.9cm}P{3.0cm}P{4.3cm}@{}}
+\caption{REST endpoints of \scpms}\label{tab:api-full}\\
+\toprule
+\textbf{Method} & \textbf{Path} & \textbf{Access} & \textbf{Purpose} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Method} & \textbf{Path} & \textbf{Access} & \textbf{Purpose} \\
+\midrule
+\endhead
+GET & \code{/health} & Public & Liveness check \\
+POST & \code{/api/auth/register} & Public (10/h) & Customer sign-up; sends verification code \\
+POST & \code{/api/auth/verify-email} & Public (20) & Verify code and sign in \\
+POST & \code{/api/auth/resend-verification} & Public (5) & New code (60\,s cooldown) \\
+POST & \code{/api/auth/login} & Public (20) & Sign in; returns access token, sets refresh cookie \\
+POST & \code{/api/auth/forgot-password} & Public (5) & Send reset link (generic response) \\
+POST & \code{/api/auth/reset-password} & Public (20) & Set new password from reset/invitation token \\
+POST & \code{/api/auth/refresh} & Cookie + CSRF header (120) & Rotate refresh token; new access token \\
+POST & \code{/api/auth/logout} & Cookie + CSRF header & End session family \\
+GET & \code{/api/parcels/track/:trackingCode} & Public (120) & Reduced public parcel view \\
+GET & \code{/api/parcels} & Auth & Role-scoped list (admin may filter by agent) \\
+POST & \code{/api/parcels} & Auth: customer & Book parcel \\
+GET & \code{/api/parcels/:id} & Auth: owner, assigned agent, admin & Parcel details \\
+POST & \code{/api/parcels/:id/assign} & Auth: admin & Assign or reassign agent \\
+POST & \code{/api/parcels/:id/status} & Auth: admin, assigned agent & Change status (lifecycle rules) \\
+POST & \code{/api/parcels/:id/location} & Auth: assigned agent & Store location of an active parcel \\
+DELETE & \code{/api/parcels/:id} & Auth: admin & Delete parcel \\
+GET & \code{/api/users/me} & Auth & Own profile \\
+GET & \code{/api/users} & Auth: admin & List users (optional role filter) \\
+POST & \code{/api/users/agents} & Auth: admin & Create agent and send invitation \\
+POST & \code{/api/users/:id/resend-invite} & Auth: admin & New invitation link \\
+PATCH & \code{/api/users/:id/status} & Auth: admin & Enable or disable account (not self) \\
+GET & \code{/api/assignments/agents} & Auth: admin & Assignable agents \\
+GET & \code{/api/analytics/dashboard} & Auth: admin & Bookings today, failed, COD collected \\
+GET & \code{/api/analytics/export/csv} & Auth: admin & CSV export \\
+GET & \code{/api/analytics/export/pdf} & Auth: admin & PDF export \\
+GET & \code{/api/geocode/search?q=...&limit=...} & Public (300) & Address to coordinates (Photon, Nominatim fallback) \\
+\bottomrule
+\end{longtable}
+\end{small}
+
+\chapter{Installation, Execution and Reproduction}
+\label{app:reproduce}
+
+\section*{Running the system locally}
+\begin{enumerate}
+  \item Install Node.js (version 20 or newer) and make a MongoDB database available, either locally or hosted.
+  \item Install the project dependencies with npm from the repository root. This installs both the backend and the frontend packages.
+  \item Create the backend configuration file from the example file supplied in \code{backend}, and set at least the database address. For e-mail, also set the SMTP account details. Without them, development mode prints e-mails, including verification codes, to the server console.
+  \item Run the backend's seed script once to create the first administrator and delivery agent. In production, their passwords must be supplied through environment variables.
+  \item Start both parts with the development script in the repository root. The API listens on port 5000, and the web client on port 5173 forwards \code{/api} requests to it.
+\end{enumerate}
+
+\section*{Reproducing the evaluation}
+The evaluation tools are stored in \code{report/evidence}. The exact commands are listed in \code{report/README.md}. The procedure is:
+\begin{enumerate}
+  \item Install the test-only tools (an in-memory MongoDB, a Socket.IO client and a headless-browser driver) in a separate folder, so the project's own dependencies remain unchanged. The first run downloads a MongoDB binary of about 600\,MB.
+  \item Run the black-box test harness against the backend. It writes the results file and a redacted server log.
+  \item Regenerate the result tables used in Chapter~5 and Appendix~\ref{app:tests} from the results file.
+  \item Optionally, run the screenshot script, which requires Google Chrome, to capture the running system.
+  \item Run the frontend linter and the production dependency audit for the static checks.
+\end{enumerate}
+The harness never reads \code{backend/.env}. It removes SMTP and database variables from its environment and uses a temporary database, so it cannot touch production data or send e-mail.
+
+\section*{Environment variables}
+Variable \emph{names} used by the backend (values are deployment secrets and are not reproduced here): \code{PORT}, \code{NODE_ENV}, \code{TRUST_PROXY_HOPS}, \code{MONGODB_URI}, \code{JWT_SECRET}, \code{JWT_ACCESS_EXPIRES}, \code{BCRYPT_ROUNDS}, \code{COOKIE_SAMESITE}, \code{COOKIE_SECURE}, \code{EMAIL_VERIFICATION}, \code{CLIENT_ORIGIN}, \code{SOCKET_CORS_ORIGIN}, \code{APP_URL}, \code{MAIL_HOST}, \code{MAIL_PORT}, \code{MAIL_SECURE}, \code{MAIL_USER}, \code{MAIL_PASS}, \code{MAIL_FROM}, \code{MAIL_FROM_NAME}, \code{GEOCODE_CONTACT}, \code{SEED_ADMIN_EMAIL}, \code{SEED_ADMIN_PASSWORD}, \code{SEED_AGENT_EMAIL}, \code{SEED_AGENT_PASSWORD}. Frontend build variables: \code{VITE_API_BASE}, \code{VITE_SOCKET_URL}, \code{VITE_GOOGLE_MAPS_API_KEY}, and for development \code{VITE_DEV_API_TARGET}.
+
+\chapter{Source-Code Index}
+\label{app:source}
+
+\begin{small}
+\begin{longtable}{@{}P{6.2cm}P{7.6cm}@{}}
+\caption{Where the main features are implemented}\label{tab:source}\\
+\toprule
+\textbf{File} & \textbf{Responsibility} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{File} & \textbf{Responsibility} \\
+\midrule
+\endhead
+\code{backend/src/index.js} & Server bootstrap, middleware chain, error handling \\
+\code{backend/src/models/User.js} & User schema, password hashing, lockout helpers \\
+\code{backend/src/models/Parcel.js} & Parcel schema, lifecycle and enumeration constants \\
+\code{backend/src/models/Session.js} & Refresh-token sessions with TTL index \\
+\code{backend/src/controllers/auth.controller.js} & Registration, verification, login, refresh, logout, reset \\
+\code{backend/src/controllers/parcel.controller.js} & Booking, listing, public view, assignment, transitions, location, deletion \\
+\code{backend/src/controllers/analytics.controller.js} & Metrics, CSV and PDF export \\
+\code{backend/src/routes/user.routes.js} & Agent onboarding, invitations, account status \\
+\code{backend/src/routes/geocode.routes.js} & Geocoding proxy \\
+\code{backend/src/middleware/auth.js} & \code{requireAuth}, \code{requireRoles}, \code{requireXhr} \\
+\code{backend/src/middleware/rateLimits.js} & Rate limiters \\
+\code{backend/src/middleware/sanitize.js} & NoSQL-operator stripping \\
+\code{backend/src/services/session.service.js} & Cookie issue, rotation, reuse detection, revocation \\
+\code{backend/src/services/socket.js} & Socket authentication, subscriptions, agent location \\
+\code{backend/src/services/realtime.js} & Room naming and scoped emission \\
+\code{backend/src/utils/*.js} & JWT, random tokens and tracking codes, validation, mailer \\
+\code{frontend/src/App.jsx} & Route table and role guards \\
+\code{frontend/src/api.js}, \code{socket.js} & HTTP client with silent refresh; socket factory \\
+\code{frontend/src/context/AuthContext.jsx} & Session restore, refresh timer \\
+\code{frontend/src/components/AdminPanel.jsx} & Administrator dashboard \\
+\code{frontend/src/pages/AdminAgentTracking.jsx} & Live agent tracking \\
+\code{frontend/src/pages/CustomerDashboard.jsx} & Booking and parcel list \\
+\code{frontend/src/pages/CustomerParcelDetail.jsx} & Customer map view and ETA heuristic \\
+\code{frontend/src/pages/CustomerQrScanner.jsx} & Parcel QR code \\
+\code{frontend/src/pages/AgentDashboard.jsx} & Agent parcels, geolocation watch \\
+\code{frontend/src/pages/AgentParcelPickUpConfirmation.jsx} & QR scanner \\
+\code{frontend/src/pages/AgentPickupConfirmPage.jsx} & Pickup confirmation \\
+\code{frontend/src/pages/ParcelDetailView.jsx} & Agent parcel page, status and location \\
+\code{frontend/src/pages/TrackPublicParcel.jsx}, \code{PublicTrack.jsx} & Public tracking (Leaflet; Google Maps) \\
+\code{frontend/src/translations/en.js}, \code{bn.js} & Interface strings \\
+\bottomrule
+\end{longtable}
+\end{small}

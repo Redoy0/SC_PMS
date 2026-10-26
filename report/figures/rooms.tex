@@ -1,0 +1,50 @@
+% Socket.IO room scoping (derived from services/socket.js and services/realtime.js)
+\begin{tikzpicture}[font=\scriptsize, >=Stealth,
+  sock/.style={card=#1, minimum width=3.9cm, minimum height=1.0cm, align=left, text width=3.4cm},
+  room/.style={gpill=#1, minimum width=3.0cm, minimum height=0.85cm, font=\scriptsize\bfseries},
+  ev/.style={card=cSock, minimum width=4.2cm, minimum height=1.0cm},
+  lab/.style={elabel, font=\tiny}]
+
+% column titles
+\foreach \x/\t/\c in {0/CONNECTED SOCKETS/cInk, 6.6/ROOMS (server side)/cCore, 13.0/EVENTS EMITTED/cSock}
+  \node[tag=\c, minimum width=3.6cm] at (\x,1.25) {\t};
+
+% sockets (icon on the left inside each card)
+\foreach \n/\c/\y/\t/\s in {s1/cAdmin/0/Admin socket/valid JWT, s2/cCust/-1.8/Customer socket/valid JWT,
+    s3/cAgent/-3.6/Agent socket/valid JWT, s4/cPub/-5.4/Anonymous socket/no JWT (public page)} {
+  \node[sock=\c] (\n) at (0,\y) {\hspace{8mm}\textbf{\t}\\\hspace{8mm}\s};
+  \pic at (-1.45,\y-0.05) {person=\c};
+}
+
+% rooms
+\node[room=cAdmin] (r1) at (6.6,0)    {\texttt{role:admin}};
+\node[room=cCust]  (r2) at (6.6,-1.8) {\texttt{user:<own id>}};
+\node[room=cCore]  (r3) at (6.6,-4.5) {\texttt{parcel:<id>}};
+
+% events
+\node[ev] (e1) at (13.0,0)    {\texttt{parcel:created}\\\tiny new bookings};
+\node[ev] (e2) at (13.0,-1.8) {\texttt{parcel:update}, \texttt{parcel:location}\\\tiny status, assignment, stored position};
+\node[ev] (e3) at (13.0,-3.6) {\texttt{agent:location:update}\\\tiny only for the agent's active parcels};
+
+% joins
+\draw[flow=cAdmin] (s1) -- node[lab, above=1pt]{auto-join on connect} (r1);
+\draw[flow=cAdmin] (s1.east) -- (r2.west);
+\draw[flow=cCust] (s2) -- node[lab, above=1pt, pos=0.4]{auto-join on connect} (r2);
+\draw[flow=cAgent] (s3.east) -- (r2.west);
+\draw[flow=cCust, dash pattern=on 3pt off 2pt] (s2.south east) to[out=-30, in=170] node[lab, pos=0.62]{subscribe:parcel\\(owner check)} (r3.west);
+\draw[flow=cPub, dash pattern=on 3pt off 2pt] (s4.east) to[out=10, in=195] node[lab, pos=0.5]{subscribe + correct\\tracking code} (r3.west);
+% blocked attempt
+\draw[cRed, line width=1pt, dash pattern=on 2pt off 2pt] ($(s4.east)+(0,-0.3)$) -- ++(1.6,-0.6) node[right, font=\scriptsize\bfseries, text=cRed]{$\times$ wrong code: not joined};
+
+% emissions
+\draw[flow=cSock] (e1) -- (r1);
+\draw[flow=cSock] (e2.west) -- (r1.east);
+\draw[flow=cSock] (e2) -- (r2);
+\draw[flow=cSock] (e2.west) -- (r3.east);
+\draw[flow=cSock] (e3.west) -- (r1.east);
+\draw[flow=cSock] (e3.west) -- (r2.east);
+\draw[flow=cSock] (e3.west) -- (r3.east);
+
+\node[card=cExt, font=\tiny, align=left, text width=4.4cm, anchor=north] at (13.0,-4.6) {%
+  \textbf{No event is broadcast to every socket.} Each emission targets named rooms only, so other customers and anonymous viewers never receive unrelated data.};
+\end{tikzpicture}

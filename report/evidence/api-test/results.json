@@ -1,0 +1,652 @@
+{
+  "summary": {
+    "environment": {
+      "date": "2026-10-19T16:20:26.044Z",
+      "node": "v24.20.0",
+      "platform": "Windows_NT 10.0.26200 x64",
+      "cpu": "AMD Ryzen 5 5600X 6-Core Processor             ",
+      "cpus": 12,
+      "memGB": 15.9,
+      "mongodb": "mongodb-memory-server (in-memory mongod)",
+      "backend": "P:\\Suppriya Defense-20261011T165740Z-1-001\\Suppriya Defense\\SmartCourier\\SmartCourier\\backend"
+    },
+    "total": 66,
+    "passed": 66,
+    "failed": 0
+  },
+  "results": [
+    {
+      "id": "T01",
+      "area": "System",
+      "requirement": "NFR-Availability",
+      "title": "Health endpoint responds",
+      "expected": "200 {status:ok}",
+      "actual": "200 {\"status\":\"ok\"}",
+      "status": "Pass"
+    },
+    {
+      "id": "T02",
+      "area": "Security",
+      "requirement": "NFR-Security",
+      "title": "Security headers set by helmet",
+      "expected": "X-Content-Type-Options=nosniff, X-Frame-Options present",
+      "actual": "nosniff=nosniff, xfo=SAMEORIGIN",
+      "status": "Pass"
+    },
+    {
+      "id": "T03",
+      "area": "System",
+      "requirement": "NFR-Robustness",
+      "title": "Unknown API route returns JSON 404",
+      "expected": "404",
+      "actual": "404",
+      "status": "Pass"
+    },
+    {
+      "id": "T04",
+      "area": "System",
+      "requirement": "NFR-Robustness",
+      "title": "Malformed JSON body rejected",
+      "expected": "400",
+      "actual": "400",
+      "status": "Pass"
+    },
+    {
+      "id": "T05",
+      "area": "Auth",
+      "requirement": "FR-01",
+      "title": "Registration rejects weak password",
+      "expected": "400 WEAK_PASSWORD",
+      "actual": "400 WEAK_PASSWORD",
+      "status": "Pass"
+    },
+    {
+      "id": "T06",
+      "area": "Auth",
+      "requirement": "FR-01",
+      "title": "Registration rejects invalid Bangladeshi mobile number",
+      "expected": "400 INVALID_PHONE",
+      "actual": "400 INVALID_PHONE",
+      "status": "Pass"
+    },
+    {
+      "id": "T07",
+      "area": "Auth",
+      "requirement": "FR-01",
+      "title": "Registration requires acceptance of terms",
+      "expected": "400 TERMS_REQUIRED",
+      "actual": "400 TERMS_REQUIRED",
+      "status": "Pass"
+    },
+    {
+      "id": "T08",
+      "area": "Auth",
+      "requirement": "FR-01",
+      "title": "Valid registration (with injected role=admin) requires email verification",
+      "expected": "201 VERIFICATION_REQUIRED",
+      "actual": "201 VERIFICATION_REQUIRED",
+      "status": "Pass"
+    },
+    {
+      "id": "T09",
+      "area": "Auth",
+      "requirement": "FR-02",
+      "title": "Unverified account cannot sign in",
+      "expected": "403 EMAIL_NOT_VERIFIED",
+      "actual": "403 EMAIL_NOT_VERIFIED",
+      "status": "Pass"
+    },
+    {
+      "id": "T10",
+      "area": "Auth",
+      "requirement": "FR-02",
+      "title": "Wrong verification code rejected",
+      "expected": "400 INVALID_CODE",
+      "actual": "400 INVALID_CODE",
+      "status": "Pass"
+    },
+    {
+      "id": "T11",
+      "area": "Auth",
+      "requirement": "FR-01, FR-02, NFR-Security",
+      "title": "Correct code verifies account, signs in and role stays customer",
+      "expected": "200, role=customer, HttpOnly refresh cookie on /api/auth",
+      "actual": "200, role=customer, cookie=HttpOnly;Path=/api/auth",
+      "status": "Pass"
+    },
+    {
+      "id": "T12",
+      "area": "Auth",
+      "requirement": "FR-01",
+      "title": "Duplicate email registration rejected",
+      "expected": "409 EMAIL_TAKEN",
+      "actual": "409 EMAIL_TAKEN",
+      "status": "Pass"
+    },
+    {
+      "id": "T13",
+      "area": "Auth",
+      "requirement": "FR-02, NFR-Security",
+      "title": "Wrong password and unknown email give the same generic response",
+      "expected": "401 INVALID_CREDENTIALS for both",
+      "actual": "401 INVALID_CREDENTIALS / 401 INVALID_CREDENTIALS",
+      "status": "Pass"
+    },
+    {
+      "id": "T14",
+      "area": "Auth",
+      "requirement": "FR-02, NFR-Security",
+      "title": "Account locks after 5 failed attempts (even correct password then fails)",
+      "expected": "423 ACCOUNT_LOCKED",
+      "actual": "423 ACCOUNT_LOCKED",
+      "status": "Pass"
+    },
+    {
+      "id": "T15",
+      "area": "Auth",
+      "requirement": "FR-02",
+      "title": "Seeded administrator signs in",
+      "expected": "200 role=admin",
+      "actual": "200 role=admin",
+      "status": "Pass"
+    },
+    {
+      "id": "T16",
+      "area": "Auth",
+      "requirement": "FR-03",
+      "title": "Protected endpoint without token rejected",
+      "expected": "401 NO_TOKEN",
+      "actual": "401 NO_TOKEN",
+      "status": "Pass"
+    },
+    {
+      "id": "T17",
+      "area": "Auth",
+      "requirement": "FR-03",
+      "title": "Protected endpoint with forged token rejected",
+      "expected": "401 INVALID_TOKEN",
+      "actual": "401 INVALID_TOKEN",
+      "status": "Pass"
+    },
+    {
+      "id": "T18",
+      "area": "Auth",
+      "requirement": "NFR-Security",
+      "title": "Refresh without X-Requested-With header blocked (CSRF defence)",
+      "expected": "403 CSRF_CHECK_FAILED",
+      "actual": "403 CSRF_CHECK_FAILED",
+      "status": "Pass"
+    },
+    {
+      "id": "T19",
+      "area": "Auth",
+      "requirement": "FR-03",
+      "title": "Refresh issues new access token and rotates refresh cookie",
+      "expected": "200, new cookie differs",
+      "actual": "200, rotated=true",
+      "status": "Pass"
+    },
+    {
+      "id": "T20",
+      "area": "Auth",
+      "requirement": "FR-03",
+      "title": "Re-using a just-rotated cookie within grace window is treated as a race",
+      "expected": "401 REFRESH_RACE",
+      "actual": "401 REFRESH_RACE",
+      "status": "Pass"
+    },
+    {
+      "id": "T21",
+      "area": "Auth",
+      "requirement": "FR-03, NFR-Security",
+      "title": "Replay of rotated cookie after grace window revokes the whole token family",
+      "expected": "401 TOKEN_REUSE, then legitimate cookie also 401",
+      "actual": "401 TOKEN_REUSE; legit=401",
+      "status": "Pass"
+    },
+    {
+      "id": "T22",
+      "area": "Auth",
+      "requirement": "FR-03",
+      "title": "Logout ends the session (refresh afterwards fails)",
+      "expected": "204 then 401",
+      "actual": "204 then 401",
+      "status": "Pass"
+    },
+    {
+      "id": "T23",
+      "area": "Access control",
+      "requirement": "FR-04",
+      "title": "Customer cannot list users",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T24",
+      "area": "Users",
+      "requirement": "FR-05",
+      "title": "Admin creates a delivery agent (invitation pending)",
+      "expected": "201, role=agent, emailVerified=false",
+      "actual": "201, role=agent, verified=false",
+      "status": "Pass"
+    },
+    {
+      "id": "T25",
+      "area": "Access control",
+      "requirement": "FR-04, FR-05",
+      "title": "Customer cannot create agents",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T26",
+      "area": "Booking",
+      "requirement": "FR-06",
+      "title": "Booking with invalid parcel size rejected",
+      "expected": "400",
+      "actual": "400",
+      "status": "Pass"
+    },
+    {
+      "id": "T27",
+      "area": "Booking",
+      "requirement": "FR-06",
+      "title": "COD amount above 500,000 rejected",
+      "expected": "400",
+      "actual": "400",
+      "status": "Pass"
+    },
+    {
+      "id": "T28",
+      "area": "Booking",
+      "requirement": "FR-06",
+      "title": "Missing pickup address rejected",
+      "expected": "400",
+      "actual": "400",
+      "status": "Pass"
+    },
+    {
+      "id": "T29",
+      "area": "Booking",
+      "requirement": "FR-06, FR-07",
+      "title": "Valid booking creates Pending parcel with 10-character tracking code",
+      "expected": "201, Pending, /^[A-HJ-NP-Z2-9]{10}$/",
+      "actual": "201, Pending, code=MEHEKH4KK7",
+      "status": "Pass"
+    },
+    {
+      "id": "T30",
+      "area": "Access control",
+      "requirement": "FR-04, FR-06",
+      "title": "Only customers can book parcels (admin refused)",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T31",
+      "area": "Access control",
+      "requirement": "FR-04, FR-08",
+      "title": "Customer list shows only own parcels",
+      "expected": "c2 sees exactly 1 parcel",
+      "actual": "count=1",
+      "status": "Pass"
+    },
+    {
+      "id": "T32",
+      "area": "Access control",
+      "requirement": "FR-04",
+      "title": "Customer cannot read another customer's parcel (IDOR)",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T33",
+      "area": "Robustness",
+      "requirement": "NFR-Robustness",
+      "title": "Malformed parcel id rejected",
+      "expected": "400",
+      "actual": "400",
+      "status": "Pass"
+    },
+    {
+      "id": "T34",
+      "area": "Tracking",
+      "requirement": "FR-09, NFR-Privacy",
+      "title": "Public tracking (case-insensitive) returns reduced view without customer data or notes",
+      "expected": "200, no customer/notes fields",
+      "actual": "200, leaked=[], historyKeys=status,at",
+      "status": "Pass"
+    },
+    {
+      "id": "T35",
+      "area": "Tracking",
+      "requirement": "FR-09",
+      "title": "Unknown or malformed tracking code returns 404",
+      "expected": "404 / 404",
+      "actual": "404 / 404",
+      "status": "Pass"
+    },
+    {
+      "id": "T36",
+      "area": "Assignment",
+      "requirement": "FR-05, FR-10",
+      "title": "Agent with pending invitation cannot be assigned",
+      "expected": "400",
+      "actual": "400 Agent is not active",
+      "status": "Pass"
+    },
+    {
+      "id": "T37",
+      "area": "Users",
+      "requirement": "FR-05",
+      "title": "Agent activates account through invitation link (weak password refused)",
+      "expected": "400 then 200",
+      "actual": "400 then 200",
+      "status": "Pass"
+    },
+    {
+      "id": "T38",
+      "area": "Auth",
+      "requirement": "FR-02, FR-05",
+      "title": "Activated and seeded agents can sign in",
+      "expected": "200 role=agent (both)",
+      "actual": "200 role=agent; agent2 token=true",
+      "status": "Pass"
+    },
+    {
+      "id": "T39",
+      "area": "Access control",
+      "requirement": "FR-04, FR-10",
+      "title": "Customer cannot assign agents",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T40",
+      "area": "Lifecycle",
+      "requirement": "FR-04, FR-11",
+      "title": "Agent cannot update a parcel not assigned to them",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T41",
+      "area": "Access control",
+      "requirement": "FR-04, FR-11",
+      "title": "Customer cannot change parcel status",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T42",
+      "area": "Assignment",
+      "requirement": "FR-10",
+      "title": "Admin assigns active agent; parcel becomes Assigned",
+      "expected": "200 Assigned",
+      "actual": "200 Assigned",
+      "status": "Pass"
+    },
+    {
+      "id": "T43",
+      "area": "Real-time",
+      "requirement": "FR-12, NFR-Privacy",
+      "title": "Assignment pushed to admin, owner and code-holding public viewer only",
+      "expected": "admin, owner, public receive; other customer and wrong-code socket do not",
+      "actual": "admin=1, owner=1, public=1, other=0, wrongCode=0",
+      "status": "Pass"
+    },
+    {
+      "id": "T44",
+      "area": "Lifecycle",
+      "requirement": "FR-11",
+      "title": "Assigned agent marks parcel Picked Up",
+      "expected": "200 Picked Up",
+      "actual": "200 Picked Up",
+      "status": "Pass"
+    },
+    {
+      "id": "T45",
+      "area": "Lifecycle",
+      "requirement": "FR-11",
+      "title": "Agent cannot move a parcel backwards",
+      "expected": "400",
+      "actual": "400 Cannot change status from Picked Up to Assigned",
+      "status": "Pass"
+    },
+    {
+      "id": "T46",
+      "area": "Assignment",
+      "requirement": "FR-10",
+      "title": "Parcel cannot be reassigned after pickup",
+      "expected": "400",
+      "actual": "400 Cannot reassign a parcel that is Picked Up",
+      "status": "Pass"
+    },
+    {
+      "id": "T47",
+      "area": "Lifecycle",
+      "requirement": "FR-11",
+      "title": "Agent marks parcel In Transit",
+      "expected": "200 In Transit",
+      "actual": "200 In Transit",
+      "status": "Pass"
+    },
+    {
+      "id": "T48",
+      "area": "Tracking",
+      "requirement": "FR-12",
+      "title": "Out-of-range coordinates rejected",
+      "expected": "400",
+      "actual": "400",
+      "status": "Pass"
+    },
+    {
+      "id": "T49",
+      "area": "Tracking",
+      "requirement": "FR-12",
+      "title": "Agent location update stored and pushed to public tracking viewer",
+      "expected": "200; public socket receives parcel:location",
+      "actual": "200; publicEvents=1",
+      "status": "Pass"
+    },
+    {
+      "id": "T50",
+      "area": "Access control",
+      "requirement": "FR-04, FR-12",
+      "title": "Another agent cannot post location for this parcel",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T51",
+      "area": "Real-time",
+      "requirement": "FR-12, NFR-Security",
+      "title": "Spoofed agent location ignored; genuine agent location delivered to admin and owner only",
+      "expected": "spoofed=0; admin>0, owner>0, other=0",
+      "actual": "spoofed=0, admin=1, owner=1, other=0",
+      "status": "Pass"
+    },
+    {
+      "id": "T52",
+      "area": "Lifecycle",
+      "requirement": "FR-11",
+      "title": "Agent marks parcel Delivered",
+      "expected": "200 Delivered",
+      "actual": "200 Delivered",
+      "status": "Pass"
+    },
+    {
+      "id": "T53",
+      "area": "Lifecycle",
+      "requirement": "FR-11",
+      "title": "Delivered parcel is locked (even for admin) and accepts no location",
+      "expected": "400 / 400",
+      "actual": "400 / 400",
+      "status": "Pass"
+    },
+    {
+      "id": "T54",
+      "area": "Lifecycle",
+      "requirement": "FR-13",
+      "title": "Status history records every transition with actor role",
+      "expected": "Pending > Assigned > Picked Up > In Transit > Delivered",
+      "actual": "Pending > Assigned > Picked Up > In Transit > Delivered",
+      "status": "Pass"
+    },
+    {
+      "id": "T55",
+      "area": "Lifecycle",
+      "requirement": "FR-11",
+      "title": "Agent can mark an active parcel Failed",
+      "expected": "200 Failed",
+      "actual": "200 Failed",
+      "status": "Pass"
+    },
+    {
+      "id": "T56",
+      "area": "Lifecycle",
+      "requirement": "FR-11 (finding)",
+      "title": "Observed behaviour: agent can skip forward from Assigned directly to Delivered",
+      "expected": "documented behaviour (forward skip allowed)",
+      "actual": "200 Delivered",
+      "status": "Pass"
+    },
+    {
+      "id": "T57",
+      "area": "Analytics",
+      "requirement": "FR-14",
+      "title": "Dashboard metrics reflect test data",
+      "expected": "dailyBookings=3, failedDeliveries=1, codAmount=2000",
+      "actual": "{\"dailyBookings\":3,\"failedDeliveries\":1,\"codAmount\":2000}",
+      "status": "Pass"
+    },
+    {
+      "id": "T58",
+      "area": "Access control",
+      "requirement": "FR-04, FR-14",
+      "title": "Customer cannot access analytics",
+      "expected": "403",
+      "actual": "403",
+      "status": "Pass"
+    },
+    {
+      "id": "T59",
+      "area": "Reports",
+      "requirement": "FR-15",
+      "title": "CSV export returns header and one row per parcel",
+      "expected": "text/csv, 1 header + 3 rows",
+      "actual": "text/csv, lines=4",
+      "status": "Pass"
+    },
+    {
+      "id": "T60",
+      "area": "Reports",
+      "requirement": "FR-15",
+      "title": "PDF export returns a PDF document",
+      "expected": "application/pdf, starts with %PDF",
+      "actual": "application/pdf, magic=%PDF",
+      "status": "Pass"
+    },
+    {
+      "id": "T61",
+      "area": "Users",
+      "requirement": "FR-05",
+      "title": "Admin cannot disable own account",
+      "expected": "400",
+      "actual": "400",
+      "status": "Pass"
+    },
+    {
+      "id": "T62",
+      "area": "Users",
+      "requirement": "FR-05, NFR-Security",
+      "title": "Disabling an account revokes existing tokens and blocks sign-in",
+      "expected": "200; old token 401 TOKEN_REVOKED; login 403 ACCOUNT_DISABLED",
+      "actual": "200; 401 TOKEN_REVOKED; 403 ACCOUNT_DISABLED",
+      "status": "Pass"
+    },
+    {
+      "id": "T63",
+      "area": "Security",
+      "requirement": "NFR-Security",
+      "title": "NoSQL operator injection in login is neutralised",
+      "expected": "400 (no session issued)",
+      "actual": "400 INVALID_CREDENTIALS",
+      "status": "Pass"
+    },
+    {
+      "id": "T64",
+      "area": "Parcels",
+      "requirement": "FR-16",
+      "title": "Admin deletes a parcel",
+      "expected": "200 then 404",
+      "actual": "200 then 404",
+      "status": "Pass"
+    },
+    {
+      "id": "T65",
+      "area": "Security",
+      "requirement": "FR-17, NFR-Security",
+      "title": "Forgot-password response identical for existing and unknown email",
+      "expected": "same 200 message",
+      "actual": "200/200 same=true",
+      "status": "Pass"
+    },
+    {
+      "id": "T66",
+      "area": "Security",
+      "requirement": "NFR-Security",
+      "title": "Email-sending endpoint rate-limited (6th request in 15 min)",
+      "expected": "429 RATE_LIMITED",
+      "actual": "429 RATE_LIMITED",
+      "status": "Pass"
+    }
+  ],
+  "performance": {
+    "httpLatencyMs": {
+      "GET /health": {
+        "n": 200,
+        "mean": 14.28,
+        "median": 15.31,
+        "p95": 18.59,
+        "max": 23.89
+      },
+      "GET /api/parcels/track/:code (public)": {
+        "n": 100,
+        "mean": 14.72,
+        "median": 15.3,
+        "p95": 22.46,
+        "max": 26.79
+      },
+      "GET /api/parcels (admin, 2 parcels)": {
+        "n": 100,
+        "mean": 14.36,
+        "median": 15.29,
+        "p95": 17.08,
+        "max": 20.34
+      }
+    },
+    "socketAgentLocationToAdminMs": {
+      "n": 50,
+      "mean": 0.32,
+      "median": 0.29,
+      "p95": 0.46,
+      "max": 1.15
+    },
+    "statusChangeToOwnerSocketMs": {
+      "samples": [
+        14.24,
+        15.23,
+        14.99
+      ]
+    }
+  }
+}

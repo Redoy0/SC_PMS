@@ -1,0 +1,35 @@
+\section{Overview}
+
+This chapter states the limitations of the work. Section~\ref{sec:limits-list} lists the limitations of the system and of its evaluation. Section~\ref{sec:notdone} lists the evaluations that were not carried out, each with a procedure for future work. Identifiers such as F1 refer to the defects and findings in Table~\ref{tab:defects}.
+
+\section{Limitations of the System and the Evaluation}
+\label{sec:limits-list}
+
+\begin{itemize}
+  \item \textbf{Evaluation scope.} Tests were run locally against an in-memory database. There was no usability study, load test, field trial or verification of the live deployment, and latency figures are local upper bounds only.
+  \item \textbf{Handover assurance.} QR codes identify parcels at pickup but contain only the database identifier and can be bypassed through manual entry. There is no confirmation step at delivery, so a delivery is recorded on the agent's word.
+  \item \textbf{Lifecycle strictness.} Agents can skip intermediate states (F1).
+  \item \textbf{Scalability and state.} The backend is a single process. Socket rooms and last-known agent positions live in memory, so they are lost on restart and not shared across instances.
+  \item \textbf{External services.} Maps, routing and geocoding rely on free public services with usage limits. One tracking page depends on a Google Maps key that is not in the repository configuration.
+  \item \textbf{Analytics.} Only three indicators and two simple exports exist.
+  \item \textbf{Code quality.} The frontend has 98 lint errors and duplicated logic across map pages, and before this work the repository had no automated tests.
+  \item \textbf{Records.} Some early project documents describe features that were never built.
+\end{itemize}
+
+\section{Evaluations Not Performed}
+\label{sec:notdone}
+
+The following evaluations would strengthen the conclusions but were \textbf{not carried out}. No results are claimed for them. Each is listed with a reproducible procedure for future work.
+
+\begin{itemize}
+  \item \textbf{Usability study.} No participants were recruited. Proposed procedure: 8--12 participants per role complete scripted tasks (book a parcel, confirm a pickup, assign an agent), measuring task completion, time on task and errors, followed by the System Usability Scale questionnaire.
+  \item \textbf{Load and scalability test.} Proposed procedure: deploy the backend and a managed MongoDB in the target region; use a load generator (for example k6 or Artillery) to simulate increasing numbers of agents emitting a location every 5--10\,s and customers polling or subscribing; record latency percentiles, error rates and CPU and memory use until saturation.
+  \item \textbf{Field trial.} Agents' phones on real routes in Dhaka, measuring GPS accuracy, update frequency, battery impact and the time between a status change and its appearance on the customer's screen over mobile networks.
+  \item \textbf{Cross-browser and device testing} of camera scanning (BarcodeDetector and ZXing paths) with printed QR codes on Android and iOS browsers.
+  \item \textbf{E-mail delivery} through a real SMTP provider, including spam-folder placement.
+  \item \textbf{Live-deployment verification} of the Render and Vercel/Netlify configuration.
+\end{itemize}
+
+\section{Summary}
+
+The system was tested for functional correctness and security on a single machine, but not with real users, under load, in the field or as a live deployment. These limitations bound the conclusions drawn in Chapter~\ref{chap:conclusion}, and the evaluations listed above are the natural next steps.

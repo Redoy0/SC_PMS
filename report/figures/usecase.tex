@@ -1,0 +1,48 @@
+% Use-case diagram (derived from routes, requireRoles guards and frontend role routes)
+\begin{tikzpicture}[font=\scriptsize, >=Stealth,
+  uc/.style={ellipse, draw=#1, line width=0.9pt, fill=#1!10, minimum width=3.7cm,
+    minimum height=0.72cm, align=center, inner sep=1pt, text=cInk, shadowed},
+  link/.style={line width=0.8pt, draw=#1!70}]
+
+% system boundary
+\node[panel=cCore, minimum width=9.4cm, minimum height=12.2cm] (sys) at (0,-1.55) {};
+\node[tag=cCore, font=\small\bfseries, inner sep=4pt] at (0,4.25) {SCPMS};
+
+% shared
+\node[uc=cExt] (u0) at (0,3.35) {Sign in / out, reset password};
+% customer & public (left column)
+\node[uc=cCust] (u1) at (-2.2,2.25) {Register \& verify e-mail};
+\node[uc=cCust] (u2) at (-2.2,1.25) {Book parcel};
+\node[uc=cCust] (u3) at (-2.2,0.25) {View own parcels \& QR};
+\node[uc=cCust] (u4) at (-2.2,-0.75) {Track parcel on map};
+\node[uc=cCust] (u5) at (-2.2,-1.75) {Receive status e-mail};
+\node[uc=cPub]  (u6) at (-2.2,-4.6) {Track by code (public)};
+% agent (right column)
+\node[uc=cAgent] (u7) at (2.2,2.25) {Scan QR \& confirm pickup};
+\node[uc=cAgent] (u8) at (2.2,1.25) {Share live location};
+\node[uc=cAgent!50!cAdmin] (u9) at (2.2,0.25) {Update parcel status};
+% admin (right column, lower)
+\node[uc=cAdmin] (u10) at (2.2,-0.75) {Assign / reassign agent};
+\node[uc=cAdmin] (u11) at (2.2,-1.75) {Onboard / disable users};
+\node[uc=cAdmin] (u12) at (2.2,-2.75) {View metrics};
+\node[uc=cAdmin] (u13) at (2.2,-3.75) {Export CSV / PDF};
+\node[uc=cAdmin] (u14) at (2.2,-4.75) {Track agents on map};
+\node[uc=cAdmin] (u15) at (2.2,-5.75) {Correct status, delete parcel};
+
+% actors
+\pic at (-6.4,1.35) {person=cCust};
+\node[pill=cCust, font=\footnotesize\bfseries] (aC) at (-6.4,0.65) {Customer};
+\pic at (-6.4,-4.25) {person=cPub};
+\node[pill=cPub, font=\footnotesize\bfseries] (aP) at (-6.4,-4.95) {Public viewer};
+\pic at (6.4,1.85) {person=cAgent};
+\node[pill=cAgent, font=\footnotesize\bfseries] (aG) at (6.4,1.15) {Delivery agent};
+\pic at (6.4,-2.95) {person=cAdmin};
+\node[pill=cAdmin, font=\footnotesize\bfseries] (aA) at (6.4,-3.65) {Administrator};
+
+\foreach \u in {u0,u1,u2,u3,u4,u5} \draw[link=cCust] (aC.north east) -- (\u.west);
+\draw[link=cPub] (aP.east) -- (u6.west);
+\foreach \u in {u0,u7,u8,u9} \draw[link=cAgent] (aG.north west) -- (\u.east);
+\foreach \u in {u9,u10,u11,u12,u13,u14,u15} \draw[link=cAdmin] (aA.west) -- (\u.east);
+% admin's sign-in link routed around the agent group to keep the diagram readable
+\draw[link=cAdmin] (aA.east) -- ++(0.55,0) |- ($(u0.north)+(0,0.25)$) -- (u0.north);
+\end{tikzpicture}

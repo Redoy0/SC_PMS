@@ -1,0 +1,245 @@
+\section{Overview}
+
+This chapter evaluates the implemented system against the requirements of Chapter~\ref{chap:method} and answers engineering question EQ3. It first states the evaluation objectives, environment and strategy (Sections~\ref{sec:evalobj}--\ref{sec:strategy}). It then reports static analysis and build results (Section~\ref{sec:static}), executed functional, security and real-time tests (Sections~\ref{sec:functional}--\ref{sec:rt-tests}), local performance observations (Section~\ref{sec:perf}) and visual verification of the running system (Section~\ref{sec:visual}). It closes with the defects found, requirements traceability and a discussion of the results. The evaluations that were not performed are listed in Chapter~\ref{chap:limits}.
+
+Throughout, the chapter distinguishes four kinds of evidence: (a) checks that were \textbf{executed} with recorded output; (b) behaviour verified by \textbf{inspection} of the code or of the running interface; (c) checks that were \textbf{not executed} but for which a procedure is proposed; and (d) earlier project documents whose claims could \textbf{not be verified}. The progress report and earlier slides contain figures such as a ``98.6\% booking success rate'', a ``0.96 test pass ratio'', ``180\,ms average API response time'' and ``under 2\,s location latency''. Those documents label these figures as estimates for demonstration, so they are \textbf{not used} here.
+
+\section{Evaluation Objectives}
+\label{sec:evalobj}
+
+\begin{enumerate}[label=E\arabic*.]
+  \item Verify that each functional requirement behaves as specified for valid input and rejects invalid input.
+  \item Verify that access control holds for every role, including attempts to act on other users' data.
+  \item Verify the session and account-security mechanisms (verification, lockout, rotation, reuse detection, revocation, CSRF defence, rate limits).
+  \item Verify that real-time events reach authorised watchers and do not reach others.
+  \item Assess code quality and dependency hygiene with standard tools.
+  \item Obtain indicative, honestly qualified latency measurements on a local machine.
+\end{enumerate}
+
+\section{Test Environment}
+\label{sec:testenv}
+
+Table~\ref{tab:testenv} describes the environment of the executed evaluation. The system under test was the unmodified backend source in the repository. The harness started it as a separate process in a temporary working directory, so the developers' private \code{backend/.env} file (which may contain production credentials) was not loaded. The database was a throw-away in-memory MongoDB, and no production data or real e-mail was involved.
+
+\begin{table}[htbp]
+\centering
+\caption{Environment of the executed evaluation}
+\label{tab:testenv}
+\small
+\begin{tabularx}{\textwidth}{@{}P{3.6cm}L@{}}
+\toprule
+\textbf{Item} & \textbf{Detail} \\
+\midrule
+Date of run & 19 October 2026 \\
+Hardware & AMD Ryzen~5 5600X (6 cores, 12 threads), 15.9\,GB RAM \\
+Operating system & Windows~11 Pro (build 26200), x64 \\
+Runtime & Node.js v24.20.0 \\
+Database & MongoDB 7.0.14 started by mongodb-memory-server (in-memory) \\
+Backend configuration & \code{NODE_ENV=development}; random 64-character JWT secret; \code{EMAIL_VERIFICATION=required}; no SMTP credentials (e-mails printed to the log); \code{BCRYPT_ROUNDS=10} to shorten the run; seeded with \code{backend/scripts/seed.js} \\
+Test clients & Node.js \code{fetch} with a cookie jar; socket.io-client 4.8.1 (WebSocket transport) \\
+Static tools & ESLint~9.33 (frontend configuration), Vite~7.3 production build, npm dependency audit, Node.js syntax check \\
+Visual verification & Headless Google Chrome via puppeteer-core 23.11, viewport 1440$\times$900, fake camera device \\
+Artefacts & \code{report/evidence/} (scripts, \code{results.json}, redacted server log, tool outputs, screenshots) \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Testing Strategy}
+\label{sec:strategy}
+
+The repository contained no automated tests before this evaluation. A complete unit-test suite could not be added without restructuring the application code, which was outside the scope of documenting the system. The strategy therefore treats the backend as a black box and exercises it through its public interfaces, as a client would:
+
+\begin{itemize}
+  \item \textbf{Static analysis and build} of the frontend, and syntax checks of all backend files, to assess code quality.
+  \item \textbf{System-level black-box tests} of the REST API and Socket.IO events against the real backend and a real (in-memory) MongoDB. Each test case corresponds to one or more requirements and checks HTTP status codes, machine-readable error codes, response content and which sockets receive which events. Because the tests pass through the complete middleware chain, controllers, models and database, they act as integration tests as well as functional tests.
+  \item \textbf{Negative and adversarial cases}: invalid input, other users' identifiers, forged and replayed tokens, injected query operators and spoofed socket messages.
+  \item \textbf{Visual end-to-end verification}: scripted navigation of the running frontend in a browser, with screenshots (Chapter~\ref{chap:method}).
+  \item \textbf{Local latency sampling} during the same run.
+\end{itemize}
+
+The harness consists of 66 test cases in \code{report/evidence/api-test/run-api-tests.cjs}. It creates its own data through the API (three customers, the seeded administrator and agent, and one invited agent), so each run starts from an empty database and is repeatable. A run takes under two minutes, including a deliberate 31-second wait that is needed to test token-reuse detection after the grace window.
+
+\section{Static Analysis and Build Results}
+\label{sec:static}
+
+\textbf{Frontend build.} The Vite production build completed successfully and transformed 448 modules. It produced a 1,879\,kB JavaScript bundle (428\,kB gzip-compressed) and a 108\,kB stylesheet. Vite warned that the main chunk exceeds 500\,kB, because the whole application, including map, QR and scanner libraries, ships as one bundle.
+
+\textbf{Frontend lint.} ESLint with the project's own configuration reported 105 problems, 98 errors and 7 warnings (Table~\ref{tab:lint}). None of them prevents the build. They do show maintenance debt and contradict an earlier internal note that the lint result was clean. The three \code{no-undef} errors concern \code{process.env.NODE_ENV}. Vite replaces this expression at build time, and the string is absent from the built bundle, so these three are false positives. The 30 duplicate keys in the translation files are genuine defects, since a later definition silently overrides an earlier one.
+
+\begin{table}[htbp]
+\centering
+\caption{ESLint findings for the frontend}
+\label{tab:lint}
+\small
+\begin{tabularx}{\textwidth}{@{}P{4.2cm}rL@{}}
+\toprule
+\textbf{Rule} & \textbf{Count} & \textbf{Interpretation} \\
+\midrule
+\code{no-unused-vars} (error) & 45 & Unused imports, state and helper functions in ten page components \\
+\code{no-dupe-keys} (error) & 30 & 15 duplicate keys in each of \code{en.js} and \code{bn.js} \\
+\code{no-empty} (error) & 18 & Empty \code{catch} blocks that silently ignore errors \\
+\code{no-undef} (error) & 3 & \code{process.env.NODE_ENV}; false positives (replaced by Vite) \\
+\code{react-refresh/only-export-components} (error) & 2 & Context files export hooks and components together (development hot-reload only) \\
+\code{react-hooks/exhaustive-deps} (warning) & 7 & Effects with incomplete dependency lists; possible stale values \\
+\midrule
+\textbf{Total} & \textbf{105} & 98 errors, 7 warnings \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\textbf{Backend.} The Node.js syntax check reported no syntax errors in any of the 26 backend files. No backend lint configuration exists.
+
+\textbf{Dependencies.} The npm audit of production dependencies reported \textbf{0 vulnerabilities} in the dependencies shipped to production. The full audit, including development tools, reported 8 advisories (6 high, 2 moderate) in the Tailwind~CSS~3 build chain (\code{braces}, \code{postcss-selector-parser}). These affect only the build machine, and fixing them requires a major upgrade to Tailwind~CSS~4.
+
+\section{Functional and Integration Test Results}
+\label{sec:functional}
+
+All 66 executed test cases passed (Table~\ref{tab:test-summary}). The paragraphs below describe the cases by area; each case is identified by its test ID.
+
+\input{tables/test-summary}
+
+\textbf{Accounts and authentication (FR-01--FR-03, FR-05, FR-17).} Registration rejected a weak password, an invalid mobile number and missing terms acceptance with distinct error codes (T05--T07). A registration that tried to set \cmd{role: "admin"} produced a customer account that required verification (T08, T11). An unverified account could not sign in (T09), a wrong code was rejected (T10), and the correct code signed the user in with a correctly scoped \code{HttpOnly} cookie (T11). Duplicate e-mails were refused (T12). An administrator-created agent could not be assigned work until it had set a password through the invitation link (T24, T36--T38). Password reset is exercised through the same endpoint by T37, and the forgot-password response was identical for existing and unknown accounts (T65).
+
+\textbf{Parcels and lifecycle (FR-06--FR-11, FR-13, FR-16).} Invalid sizes, excessive COD amounts and missing addresses were rejected (T26--T28). A valid booking produced a Pending parcel with a ten-character code drawn from the documented alphabet (T29). Assignment, pickup, transit and delivery followed the state machine (T42, T44, T47, T52). Backward moves, reassignment after pickup and any change after delivery were refused, even for an administrator (T45, T46, T53). The history recorded the full sequence with the actor's role (T54), and an active parcel could be marked Failed (T55). T56 confirmed that an agent can move a parcel directly from Assigned to Delivered. This is consistent with the forward-only rule but is reported as a design finding (Section~\ref{sec:defects}).
+
+\textbf{Analytics and export (FR-14, FR-15).} After the scripted scenario, the dashboard returned exactly the expected values: 3 bookings today, 1 failed delivery, and 2,000 taka of COD collected from the two delivered COD parcels (T57). The CSV export contained a header and one row per parcel, and the PDF export was a valid PDF document (T59, T60).
+
+\section{Security and Access-Control Test Results}
+\label{sec:sec-tests}
+
+All test cases that target access control and security passed. In summary:
+
+\begin{itemize}
+  \item \textbf{Role checks.} Customers could not list users, create agents, assign agents, change statuses or read analytics, and administrators could not book parcels (T23, T25, T30, T39, T41, T58).
+  \item \textbf{Ownership checks.} A customer could not read another customer's parcel by its identifier (IDOR, T32) and saw only their own parcels (T31). Agents could not update or locate parcels that were not assigned to them (T40, T50).
+  \item \textbf{Tokens and sessions.} Missing and forged tokens were rejected (T16, T17). The refresh endpoint refused requests without the CSRF header (T18), rotated the cookie (T19), tolerated a concurrent reuse within the grace window (T20) and, after the window, revoked the whole token family, including the legitimate holder's session (T21). Logout ended the session (T22). Disabling an account invalidated an access token that was still within its lifetime and blocked sign-in (T62).
+  \item \textbf{Brute force and enumeration.} Five failed attempts locked the account, and a correct password during the lock was refused (T14). Wrong-password and unknown-account responses were identical (T13), and the sixth e-mail-sending request in the window was rate-limited with HTTP~429 (T66).
+  \item \textbf{Injection and robustness.} A login body containing \code{$ne} operators was neutralised and returned 400 without a session (T63). Malformed JSON, malformed identifiers and unknown routes produced 4xx responses (T03, T04, T33), and \code{helmet} headers were present (T02).
+  \item \textbf{Privacy.} The public tracking response contained no customer object, no notes and no actor identifiers in the history (T34).
+\end{itemize}
+
+\section{Real-Time Behaviour}
+\label{sec:rt-tests}
+
+Seven sockets were connected during the scenario: an administrator, the parcel owner, an unrelated customer, an anonymous viewer that proved the tracking code, an anonymous viewer that supplied a wrong code, the agent, and a customer socket used to attempt spoofing. When the parcel was assigned, \code{parcel:update} reached the administrator, the owner and the code-holding viewer, and did \emph{not} reach the unrelated customer or the wrong-code viewer (T43). A stored location update reached the public viewer as \code{parcel:location} (T49). A forged \code{agent:location:update} sent from a customer socket on behalf of the agent was dropped. The agent's genuine update reached the administrator and the owner of the agent's active parcel, but not the unrelated customer (T51). These results confirm the room-scoping design of Figure~\ref{fig:rooms}.
+
+\section{Performance Observations}
+\label{sec:perf}
+
+Latency was sampled during the same run (Table~\ref{tab:latency}). Requests were sent \emph{sequentially} from the same machine over the loop-back interface to the in-memory database.
+
+\input{tables/latency}
+
+These figures need careful interpretation:
+\begin{itemize}
+  \item The median HTTP round trip was about 15.3\,ms for all three endpoints, including \code{/health}, which does no database work. An identical floor for a trivial and a non-trivial endpoint indicates that the value is dominated by client-side and operating-system overheads on this Windows machine (consistent with its timer granularity of about 15.6\,ms), not by application processing. The values are therefore an \emph{upper bound} for local processing time. They are not a measure of the server.
+  \item The socket fan-out median of 0.29\,ms shows that room-scoped delivery adds negligible overhead on one machine with a warm room cache.
+  \item No network latency, concurrent load, realistic data volume or remote database was involved. The numbers \textbf{must not} be generalised to a deployed system, and they say nothing about scalability. A load test is proposed in Section~\ref{sec:notdone}.
+\end{itemize}
+
+\section{Visual Verification of the Running System}
+\label{sec:visual}
+
+The screenshots in Chapter~\ref{chap:method} were produced by a script that started the backend and frontend, created demonstration data through the API and visited each page in headless Chrome. Inspecting them confirmed, by observation rather than assertion, that:
+\begin{itemize}
+  \item the landing, registration and login pages render, and the interface switches completely to Bangla (Figure~\ref{fig:shot-landing});
+  \item the customer dashboard lists parcels in all six states with correct status badges and COD amounts (Figure~\ref{fig:shot-customer});
+  \item the QR page renders a scannable QR code encoding the parcel URL, and the pickup confirmation page shows the correct parcel and assigned agent (Figure~\ref{fig:shot-qrflow});
+  \item the public tracking page geocodes both addresses, draws an OSRM road route on OSM tiles and shows no customer data (Figure~\ref{fig:shot-public});
+  \item the administrator dashboard shows indicators consistent with the demonstration data, invitation states and assignment locking (Figure~\ref{fig:shot-admin});
+  \item with an agent signed in on another tab, the administrator tracking page marks the agent online and displays the live (simulated) coordinates on the map (Figure~\ref{fig:shot-tracking}).
+\end{itemize}
+
+Camera scanning itself was not verified with a physical QR code: headless Chrome supplies only a synthetic test pattern. E-mail rendering was not verified with a real SMTP server.
+
+\section{Defects and Findings}
+\label{sec:defects}
+
+Table~\ref{tab:defects} lists the defects and design findings identified during the evaluation. Severity reflects the impact on the current single-operator use.
+
+\begin{longtable}{@{}P{0.7cm}P{5.6cm}P{1.7cm}P{5.4cm}@{}}
+\caption{Defects and findings}\label{tab:defects}\\
+\toprule
+\textbf{ID} & \textbf{Finding} & \textbf{Severity} & \textbf{Evidence and recommendation} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{ID} & \textbf{Finding} & \textbf{Severity} & \textbf{Evidence and recommendation} \\
+\midrule
+\endhead
+F1 & Agents may skip lifecycle states (e.g.\ Assigned $\rightarrow$ Delivered), so the history need not contain every step & Medium & T56; require consecutive transitions for agents, or record skipped states explicitly \\
+F2 & Google Maps API key absent from the production environment file; \code{/track/:code} shows a map error unless configured on the host & Medium & \code{frontend/.env.production}; configure the key or consolidate on the Leaflet tracking page \\
+F3 & Routes and geocoding recomputed on location updates; dependence on rate-limited public OSRM and geocoding services & Medium & Code inspection; cache geocoded coordinates on the parcel and recompute routes only when endpoints change \\
+F4 & Debug button ``Test agent location'' visible to customers on the parcel page & Low & \code{CustomerParcelDetail.jsx}; remove or restrict to development builds \\
+F5 & COD amount shown with ``\$'' instead of taka on the customer parcel page & Low & Figure~\ref{fig:shot-customer-detail}; use the taka sign as elsewhere \\
+F6 & 98 lint errors, including 30 duplicate translation keys and 18 empty \code{catch} blocks & Low & Table~\ref{tab:lint}; fix and enforce lint in CI \\
+F7 & Two public tracking pages with different maps and live-update behaviour & Low & \code{PublicTrack.jsx} vs \code{TrackPublicParcel.jsx}; consolidate \\
+F8 & \code{/parcel/:id/route} is a public route but calls an authenticated endpoint & Low & \code{App.jsx}, \code{ParcelRoute.jsx}; guard the route or remove it \\
+F9 & QR page heading mentions ``pickup/delivery'' but scanning exists only at pickup & Low & \code{CustomerQrScanner.jsx}; correct the wording or implement delivery confirmation \\
+F10 & 1.88\,MB single JavaScript bundle & Low & Build output; split map and scanner code with dynamic imports \\
+F11 & Last-known agent positions kept in process memory; single-instance Socket.IO & Limitation & \code{services/socket.js}; persist positions and use a shared adapter to scale \\
+F12 & Password composition rule and no breached-password screening, contrary to NIST guidance & Low & \code{utils/validation.js}; adopt length-based policy with a blocklist \cite{nist80063b} \\
+F13 & Development-only dependency advisories (8) & Low & npm audit; upgrade the Tailwind toolchain \\
+F14 & No automated test suite in the repository before this work; Postman collection outdated & Process & Adopt the harness in CI; regenerate the collection \\
+\bottomrule
+\end{longtable}
+
+\section{Requirements Traceability}
+\label{sec:traceability}
+
+Table~\ref{tab:trace} links every requirement to its implementation and evidence. ``Test'' means verified by an executed test case. ``Inspection'' means verified by reading the code or observing the running interface, without an automated assertion.
+
+\begin{longtable}{@{}P{1.9cm}P{4.3cm}P{3.8cm}P{3.6cm}@{}}
+\caption{Requirements traceability matrix}\label{tab:trace}\\
+\toprule
+\textbf{Req.} & \textbf{Implementation} & \textbf{Evidence} & \textbf{Status} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Req.} & \textbf{Implementation} & \textbf{Evidence} & \textbf{Status} \\
+\midrule
+\endhead
+FR-01 & \code{register} & T05--T08, T11, T12 & Met (test) \\
+FR-02 & \code{login}, \code{verifyEmail} & T09--T11, T13--T15, T38 & Met (test) \\
+FR-03 & \code{session.service}, \code{refresh}, \code{logout} & T16--T22 & Met (test) \\
+FR-04 & \code{requireRoles}, ownership checks & T23, T25, T30--T32, T39--T41, T50, T58 & Met (test) \\
+FR-05 & \code{user.routes.js} & T24, T36--T38, T61, T62 & Met (test) \\
+FR-06 & \code{createParcel} & T26--T30 & Met (test) \\
+FR-07 & \code{utils/tokens.js} & T29 & Met (test) \\
+FR-08 & \code{listParcels} & T31 & Met (test) \\
+FR-09 & \code{getParcelByTrackingCode} & T34, T35; Fig.~\ref{fig:shot-public} & Met (test) \\
+FR-10 & \code{assignAgent} & T36, T42, T46 & Met (test) \\
+FR-11 & \code{transitionError}, \code{updateStatus} & T40--T47, T52--T56 & Met, with finding F1 \\
+FR-12 & \code{updateLocation}, socket handlers & T48--T51; Fig.~\ref{fig:shot-tracking} & Met (test) \\
+FR-13 & \code{statusHistory} & T54 & Met (test) \\
+FR-14 & \code{dashboardMetrics} & T57 & Met (test) \\
+FR-15 & \code{exportCsv}, \code{exportPdf} & T59, T60 & Met (test) \\
+FR-16 & \code{deleteParcel} & T64 & Met (test) \\
+FR-17 & \code{forgotPassword}, \code{resetPassword} & T65, T37 (shared endpoint) & Met (test; e-mail delivery not tested) \\
+FR-18 & QR and scanner pages & Fig.~\ref{fig:shot-qrflow}; T44 (server side) & Met at pickup (inspection); physical scan not tested \\
+FR-19 & \code{sendStatusEmail} & Code inspection & Implemented; not exercised (needs SMTP) \\
+FR-20 & \code{translations/} & Fig.~\ref{fig:shot-landing} & Met (inspection); duplicate keys (F6) \\
+FR-21 & Leaflet, OSRM, geocode proxy & Figs.~\ref{fig:shot-public}, \ref{fig:shot-customer-detail} & Met (inspection); F2, F3 \\
+\midrule
+Security & See Table~\ref{tab:threats} & T02, T11--T22, T62--T63, T65--T66 & Met for tested controls \\
+Privacy & Public view, room scoping & T34, T43, T51 & Met (test) \\
+Responsive. & Socket.IO rooms & T43, T49, T51; Table~\ref{tab:latency} & Met locally; not load-tested \\
+Robustness & Error handler, validation & T03, T04, T33 & Met (test) \\
+Usability & Responsive UI, Bangla, fallbacks & Screenshots & Not formally evaluated \\
+Maintain. & Layered modules & Code inspection; lint & Partly met (F6, F14) \\
+Deploy. & Env configuration, health check & T01; configuration files & Configured; live deployment not verified \\
+\bottomrule
+\end{longtable}
+
+\section{Discussion}
+\label{sec:discussion}
+
+The executed evidence supports a positive answer to EQ3 within clear limits. Every functional requirement that can be exercised through the API is met, and the security mechanisms behave as designed under adversarial input. The tests found no failures in authorisation, lifecycle enforcement or event scoping. In particular, behaviours that are easy to get wrong in web applications were verified rather than assumed: IDOR protection, revocation of still-valid tokens, refresh-token reuse detection and the exclusion of unauthorised sockets from parcel rooms.
+
+The evaluation also shows where the system falls short. Code quality on the frontend is uneven (98 lint errors). Some user-interface defects remain (F2, F4, F5, F7--F9). One lifecycle rule (F1) is weaker than the word ``sequential'' would suggest. The QR step identifies parcels but does not prove a handover. Performance has been observed only locally, and the free map and geocoding services are an operational dependency (F3).
+
+These results are consistent with the project's framing as an applied engineering project: the contribution is a working, secure and verifiable system, not a measured improvement over an existing operation. No claim of operational improvement (for example fewer delays or higher customer satisfaction) can be made without the field and user studies of Section~\ref{sec:notdone}.
+
+\section{Summary}
+
+Static analysis, a production build, a dependency audit and 66 executed black-box tests were used to evaluate \scpms. All tests passed, covering accounts, sessions, access control, the parcel lifecycle, analytics, exports, injection resistance, rate limiting and real-time event scoping. The production dependencies have no known vulnerabilities. Local latency figures are reported with their limitations. Fourteen defects and findings were documented. The evaluations that could not be performed are listed in Chapter~\ref{chap:limits}, together with procedures for carrying them out.

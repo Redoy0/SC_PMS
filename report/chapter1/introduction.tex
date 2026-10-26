@@ -1,0 +1,114 @@
+\section{Overview}
+\label{sec:intro-overview}
+
+Parcel delivery has become a routine part of commerce and daily life. The growth of e-commerce has greatly increased the number of direct-to-consumer deliveries and, with them, the challenges of the ``last mile'': the final leg in which a parcel is collected from a sender and handed to a recipient \cite{savelsbergh2016city,boysen2021lastmile}. Reviews of last-mile research describe this leg as one of the least efficient and most costly stages of the delivery chain, and identify information sharing, routing and coordination between actors as recurring problems \cite{boysen2021lastmile,ranieri2018review,olsson2019framework}. In cities the difficulty is compounded by congestion and by customers' desire for fast delivery, sometimes on the same day \cite{savelsbergh2016city}.
+
+For a courier operator the practical consequence is a coordination problem. Customers want to know where their parcel is; dispatchers need to know which agent holds which parcel; and delivery agents need an unambiguous list of assignments and a simple way to record progress. When this information is spread across telephone calls, paper records and informal messaging, every party works with an incomplete and delayed picture. The literature on supply-chain visibility makes the same point at a larger scale: the ability to \emph{track} a product forward and \emph{trace} its history backward depends on capturing status events in a shared, structured record \cite{musa2014visibility}.
+
+This thesis presents the design, implementation and evaluation of the \textbf{Smart Courier and Parcel Management System (\scpms)}, a web application that gives a single courier operator one shared, role-controlled record of every parcel and propagates changes to that record to the interested parties in real time. The system is built on the MERN stack (MongoDB, Express, React and Node.js) with Socket.IO for real-time messaging and OpenStreetMap-based maps. It supports three authenticated roles, namely customer, delivery agent and administrator, together with an unauthenticated public tracking page.
+
+\section{Problem Statement}
+\label{sec:problem}
+
+The project addresses the following problem, as identified in the project proposal and progress report and confirmed against the scope of the implemented system:
+
+\begin{quote}
+\emph{Small and medium courier operations that coordinate parcels manually, or with disconnected tools, cannot give customers timely visibility of their parcels, cannot reliably control which agent is responsible for which parcel, and lack a consolidated operational view for administrators. Status changes are communicated late or inconsistently, and there is no trustworthy record of who changed a parcel's status and when.}
+\end{quote}
+
+Four specific deficiencies follow from this statement:
+\begin{enumerate}
+  \item \textbf{Visibility:} customers cannot see the current status or approximate position of a parcel without contacting the operator.
+  \item \textbf{Coordination and responsibility:} assignment of parcels to agents, and the rules for who may change a parcel's state, are informal.
+  \item \textbf{Accountability:} the history of status changes is not recorded with the identity of the actor.
+  \item \textbf{Operational insight:} administrators lack basic indicators (bookings, failed deliveries, cash-on-delivery totals) and exportable records.
+\end{enumerate}
+
+Because the system handles personal data (names, addresses, telephone numbers) and controls operational state, any solution must also be \textbf{secure}: users must only see and change what their role permits, and public tracking must not expose personal data.
+
+\section{Motivation and Rationale}
+\label{sec:motivation}
+
+Commercial carriers operate their own tracking platforms \cite{dhltracking,pathaocourier}, and several published tracking systems are built around dedicated tracking hardware installed in each vehicle \cite{lee2014vehicle,elmedany2014tracking}. A small operator, however, needs neither proprietary infrastructure nor dedicated hardware: delivery agents already carry smartphones with a browser, a camera and a location sensor. Web standards such as the Geolocation API \cite{w3cgeolocation} and the WebSocket protocol \cite{rfc6455}, together with open map data \cite{haklay2008osm} and open routing engines \cite{luxen2011osrm}, make it possible to build live tracking and camera-based identification with commodity devices and open-source software.
+
+The project was therefore motivated by a practical question: whether a small team can build, with widely used open-source web technologies, a courier system that combines role-based coordination, real-time visibility and secure public tracking in one coherent and verifiable application. The local context of the authors (Dhaka, Bangladesh) shaped several requirements, including Bangladeshi mobile-number validation, cash-on-delivery (COD) support and a Bangla user interface.
+
+\section{Aim and Objectives}
+\label{sec:objectives}
+
+\textbf{Aim.} To design, implement and evaluate a secure, role-based web system that manages the parcel lifecycle of a courier operator and provides real-time parcel and agent visibility to authorised users.
+
+\textbf{Specific objectives.} Table~\ref{tab:objectives} lists the objectives and links each one to the implementation component that realises it and the evidence used to evaluate it.
+
+\begin{table}[htbp]
+\centering
+\caption{Objectives, implementing components and evaluation evidence}
+\label{tab:objectives}
+\small
+\begin{tabularx}{\textwidth}{@{}p{0.6cm}LLP{3.2cm}@{}}
+\toprule
+\textbf{ID} & \textbf{Objective} & \textbf{Implementing component} & \textbf{Evaluation evidence} \\
+\midrule
+O1 & Provide secure registration, authentication and session management for three roles & Auth controller, session service, JWT utilities (Section~\ref{sec:impl-auth}) & Tests T05--T22, T61--T62 \\
+O2 & Enforce role-based and ownership-based access control on every operation & \code{requireRoles}, ownership checks, route guards (Section~\ref{sec:impl-authz}) & Tests T23--T25, T30--T32, T39--T41, T50, T58 \\
+O3 & Manage the parcel lifecycle from booking to delivery with server-enforced transitions and an audit trail & Parcel model and controller (Section~\ref{sec:impl-lifecycle}) & Tests T26--T29, T42--T56 \\
+O4 & Propagate status and location changes in real time to authorised watchers only, and offer public tracking by code & Socket.IO rooms, public tracking endpoint (Section~\ref{sec:impl-realtime}) & Tests T34--T35, T43, T49, T51 \\
+O5 & Support QR-assisted parcel identification at pickup and map-based route display & QR pages, Leaflet/OSRM maps (Sections~\ref{sec:impl-maps}--\ref{sec:impl-qr}) & Screenshots; tests T44; manual inspection \\
+O6 & Give administrators operational indicators, user management and CSV/PDF export & Admin panel, analytics controller (Section~\ref{sec:impl-analytics}) & Tests T24, T57--T62 \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Engineering Questions}
+\label{sec:questions}
+
+The project is an applied engineering project rather than an experimental study. Three engineering questions frame the evaluation:
+
+\begin{description}
+  \item[EQ1] How can a web application give customers, delivery agents and administrators consistent, role-appropriate visibility of a shared parcel lifecycle?
+  \item[EQ2] How can live status and location changes be propagated in real time without disclosing information to unauthorised parties, including anonymous public viewers?
+  \item[EQ3] To what extent does the implemented system satisfy its functional and security requirements, as measured by executable tests against the unmodified code?
+\end{description}
+
+EQ1 and EQ2 are answered through the design and implementation (Chapter~\ref{chap:method}). EQ3 is answered by the test evidence in Chapter~\ref{chap:results}. Chapter~\ref{chap:conclusion} returns to all three.
+
+\section{Scope and Boundaries}
+\label{sec:scope}
+
+\textbf{In scope.} Customer self-registration with e-mail verification; administrator-managed agent accounts; parcel booking; agent assignment; a six-state lifecycle (Pending, Assigned, Picked Up, In Transit, Delivered, Failed); real-time status and location updates; public tracking by code; QR-assisted pickup; e-mail notifications; basic operational metrics; CSV and PDF export; an English and Bangla interface; and deployment configuration for Render and Vercel/Netlify.
+
+\textbf{Out of scope.} Multiple branches or hubs; warehouse management; route optimisation; pricing and payment processing (COD amounts are recorded, not collected electronically); SMS notifications; native mobile applications; delay prediction; and integration with external carriers. Some of these were mentioned in early project documents but were not implemented and are not claimed in this report.
+
+\textbf{Evaluation boundary.} Evaluation was carried out on a local machine against an in-memory database. No usability study, field trial with real agents or load test against a live deployment was performed; these are identified as future work.
+
+\section{Intended Users and Stakeholders}
+\label{sec:stakeholders-intro}
+
+\begin{itemize}
+  \item \textbf{Customers} (senders) who book parcels, follow them and receive notifications.
+  \item \textbf{Delivery agents} who pick up and deliver parcels and share their location while working.
+  \item \textbf{Administrators} (dispatchers or managers of the courier operator) who assign agents, manage accounts and monitor operations.
+  \item \textbf{Recipients and other public viewers} who hold a tracking code and want to see a parcel's status without an account.
+  \item \textbf{The operator} as an organisation, which needs reliable records and protection of customer data.
+\end{itemize}
+
+\section{Significance and Contribution}
+\label{sec:contribution}
+
+The contribution of this work is the \emph{design, integration and evidence-based evaluation} of a complete courier management system. It does not propose a new algorithm. Specifically, the thesis contributes:
+\begin{enumerate}
+  \item a working, documented system that integrates role-based coordination, a server-enforced parcel lifecycle with an audit trail, and real-time tracking for one courier operator;
+  \item a real-time design in which every Socket.IO event is delivered through scoped rooms, so that anonymous viewers receive updates only for a parcel whose tracking code they have proven;
+  \item a session design that combines short-lived access tokens with rotating, reuse-detecting refresh cookies, applied and tested in an undergraduate-scale system;
+  \item a reproducible evaluation package: 66 executable black-box tests, static-analysis results and screenshots of the running system, together with an honest account of defects and limitations.
+\end{enumerate}
+
+\section{Methodological Overview}
+\label{sec:method-overview}
+
+The project followed an iterative and incremental development process \cite{larman2003iterative,sommerville2016se}: requirements were derived from the courier workflow and the proposal, the core modules (authentication, lifecycle and tracking) were built first, and notifications, analytics, the bilingual interface and security hardening were added in later increments. The evaluation combines static analysis, a production build, a dependency audit, black-box API and Socket.IO tests against the unmodified backend, and local latency sampling. Chapter~\ref{chap:method} describes the method in detail.
+
+\section{Report Organization}
+\label{sec:organization}
+
+Chapter~\ref{chap:review} reviews literature on last-mile logistics, tracking and visibility, comparable courier systems, real-time web communication, access control and web security. Chapter~\ref{chap:method} describes the methodology: the requirements, models and design, and their implementation, with screenshots of the running system. Chapter~\ref{chap:results} analyses and discusses the results of the testing and evaluation, including the requirements traceability. Chapter~\ref{chap:limits} states the limitations of the system and of its evaluation. Chapter~\ref{chap:conclusion} summarises the work, answers the engineering questions and outlines future work.

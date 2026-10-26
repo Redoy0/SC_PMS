@@ -1,0 +1,43 @@
+% System context diagram (derived from backend/src/index.js, routes/geocode.routes.js,
+% utils/mailer.js and the frontend map pages)
+\begin{tikzpicture}[font=\small, >=Stealth]
+% ---- core system
+\node[gcard=cCore, minimum width=5.0cm, minimum height=3.0cm, font=\normalsize\bfseries] (s) at (0,0) {};
+\node[text=white, font=\Large\bfseries] at (0,0.75) {SCPMS};
+\node[text=white, font=\footnotesize, align=center] at (0,0.05) {Smart Courier and Parcel\\Management System};
+\node[fill=white, text=cCore, font=\tiny\bfseries, rounded corners=2pt, inner sep=2.5pt] at (0,-0.85)
+  {React SPA \,$\cdot$\, Express API \,$\cdot$\, Socket.IO};
+
+% ---- actors (left)
+\foreach \n/\c/\y/\t in {cus/cCust/2.7/Customer, agt/cAgent/0.9/Delivery agent, adm/cAdmin/-0.9/Administrator, pub/cPub/-2.7/Public viewer}{
+  \pic at (-7.4,\y+0.18) {person=\c};
+  \node[pill=\c, font=\footnotesize\bfseries, minimum width=2.6cm] (\n) at (-7.4,\y-0.48) {\t};
+}
+\coordinate (cusA) at (-6.05,2.25); \coordinate (agtA) at (-6.05,0.45);
+\coordinate (admA) at (-6.05,-1.35); \coordinate (pubA) at (-6.05,-3.15);
+
+\draw[bflow=cCust] (cus.east) to[out=0, in=165] node[elabel, pos=0.55]{book, track, show QR} (s.155);
+\draw[bflow=cAgent] (agt.east) to[out=0, in=180] node[elabel, pos=0.5]{scan QR, update status,\\share live location} (s.182);
+\draw[bflow=cAdmin] (adm.east) to[out=0, in=195] node[elabel, pos=0.5]{assign agents, manage users,\\metrics, CSV/PDF export} (s.200);
+\draw[bflow=cPub] (pub.east) to[out=0, in=215] node[elabel, pos=0.5]{tracking code $\rightarrow$ status, route,\\live position (no personal data)} (s.215);
+
+% ---- external services (right)
+\node[card=cExt, minimum width=3.4cm, minimum height=1.05cm, align=left, anchor=west] (smtp) at (5.6,2.7) {\hspace{0.9cm}\textbf{SMTP e-mail}\\\hspace{0.9cm}\scriptsize verification, reset, status};
+\pic at ($(smtp.west)+(0.5,0)$) {mail=cExt};
+\node[card=cExt, minimum width=3.4cm, minimum height=1.05cm, align=left, anchor=west] (geo) at (5.6,0.9) {\hspace{0.9cm}\textbf{Geocoding}\\\hspace{0.9cm}\scriptsize Photon / Nominatim};
+\pic at ($(geo.west)+(0.5,0)$) {pin=cRed};
+\node[card=cExt, minimum width=3.4cm, minimum height=1.05cm, align=left, anchor=west] (map) at (5.6,-0.9) {\hspace{0.9cm}\textbf{Maps \& routing}\\\hspace{0.9cm}\scriptsize OSM tiles, OSRM, Google};
+\pic at ($(map.west)+(0.5,0)$) {mapicon=cExt};
+\node[card=cData, minimum width=3.4cm, minimum height=1.05cm, align=left, anchor=west] (db) at (5.6,-2.7) {\hspace{0.9cm}\textbf{MongoDB}\\\hspace{0.9cm}\scriptsize users, parcels, sessions};
+\pic at ($(db.west)+(0.5,0)$) {db=cData};
+
+\draw[flow=cExt] (s.25) to[out=10, in=180] node[elabel, pos=0.5]{send mail} (smtp.west);
+\draw[bflow=cExt] (s.5) to[out=0, in=180] node[elabel]{address $\leftrightarrow$ coords} (geo.west);
+\draw[bflow=cExt] (s.-5) to[out=0, in=180] node[elabel]{tiles, routes} (map.west);
+\draw[bflow=cData] (s.-25) to[out=-10, in=180] node[elabel, pos=0.5]{read / write} (db.west);
+
+% ---- legend
+\node[font=\scriptsize, text=cInk, anchor=north] at (0,-3.6) {%
+  \tikz\draw[flow=cInk] (0,0) -- (0.6,0); one direction \quad
+  \tikz\draw[bflow=cInk] (0,0) -- (0.6,0); request and response};
+\end{tikzpicture}

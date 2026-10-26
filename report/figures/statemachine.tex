@@ -1,0 +1,45 @@
+% Parcel lifecycle state machine (derived from transitionError() and assignAgent()
+% in backend/src/controllers/parcel.controller.js)
+\begin{tikzpicture}[font=\small, >=Stealth,
+  st/.style={gpill=#1, minimum width=2.4cm, minimum height=0.95cm},
+  lab/.style={elabel, font=\scriptsize\bfseries, text=#1}]
+
+% phase bands (background)
+\fill[cPub!7, rounded corners=6pt] (-1.45,-0.95) rectangle (1.45,1.75);
+\node[font=\tiny\bfseries, text=cPub] at (0,1.5) {WAITING};
+\fill[cCust!6, rounded corners=6pt] (2.75,-0.95) rectangle (14.05,1.75);
+\node[font=\tiny\bfseries, text=cCust] at (8.4,1.5) {ACTIVE \,--\, the assigned agent is responsible};
+\fill[cMuted!14, rounded corners=6pt] (4.6,-4.25) rectangle (14.6,-2.35);
+\node[font=\tiny\bfseries, text=cExt] at (9.6,-4.05) {FINAL \,--\, locked for every role};
+
+% states
+\fill[cInk] (-3.1,0) circle (0.17);
+\node[st=cPub]   (pending)   at (0,0)    {Pending};
+\node[st=cCust]  (assigned)  at (4.2,0)  {Assigned};
+\node[st=cCore]  (picked)    at (8.4,0)  {Picked Up};
+\node[st=cSock]  (transit)   at (12.6,0) {In Transit};
+\node[st=cOk, double, double distance=1.2pt]  (delivered) at (12.6,-3.25) {Delivered};
+\node[st=cRed, double, double distance=1.2pt] (failed)    at (6.3,-3.25) {Failed};
+\draw[cInk, line width=0.8pt] (14.35,-3.25) circle (0.2); \fill[cInk] (14.35,-3.25) circle (0.11);
+\draw[flow=cInk] (delivered) -- (14.1,-3.25);
+
+% transitions
+\draw[flow=cCust]  (-2.93,0) -- node[lab=cCust, above=4pt]{customer\\books} (pending);
+\draw[flow=cAdmin] (pending) -- node[lab=cAdmin, above=4pt]{admin\\assigns} (assigned);
+\draw[flow=cAdmin] (assigned.north east) .. controls +(0.5,1.1) and +(-0.5,1.1) .. node[lab=cAdmin, above]{admin reassigns} (assigned.north west);
+\draw[flow=cAgent] (assigned) -- node[lab=cAgent, above=4pt]{agent\\(QR pickup)} (picked);
+\draw[flow=cAgent] (picked) -- node[lab=cAgent, above=4pt]{agent} (transit);
+\draw[flow=cAgent] (transit) -- node[lab=cAgent, right=4pt]{agent} (delivered);
+\draw[flow=cRed] (assigned) -- node[lab=cRed, pos=0.45]{agent} (failed);
+\draw[flow=cRed] (picked) -- node[lab=cRed, pos=0.45]{agent} (failed);
+\draw[flow=cRed] (transit) -- node[lab=cRed, pos=0.4]{agent} (failed);
+\draw[flow=cMuted, dash pattern=on 3pt off 2pt] (pending) |- node[lab=cAdmin, pos=0.3]{admin only} (failed);
+
+% rules box
+\node[card=cExt, align=left, font=\scriptsize, text width=12.2cm, anchor=north] at (6.3,-4.65) {%
+  \textbf{Rules enforced by the server (\texttt{transitionError})}\\[1pt]
+  \textcolor{cAgent}{$\triangleright$} Only the \textbf{assigned agent} may change a parcel's status as an agent.\\
+  \textcolor{cAgent}{$\triangleright$} Agents move only \textbf{forward}, or to Failed while active; forward skips are allowed (e.g.\ Assigned $\rightarrow$ Delivered).\\
+  \textcolor{cAdmin}{$\triangleright$} Administrators may change any non-final parcel to any other state.\\
+  \textcolor{cRed}{$\triangleright$} Delivered and Failed are \textbf{final}; (re)assignment is possible only while Pending or Assigned.};
+\end{tikzpicture}
